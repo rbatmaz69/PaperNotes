@@ -1,22 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Simple folded-paper note glyph, drawn in espresso on the cream adaptive background. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Paper sheet -->
-    <path
-        android:fillColor="#F4D58D"
-        android:pathData="M38,30h26l16,16v32a4,4 0 0 1 -4,4H38a4,4 0 0 1 -4,-4V34a4,4 0 0 1 4,-4z" />
-    <!-- Dog-ear fold (sage) -->
-    <path
-        android:fillColor="#B7CDB0"
-        android:pathData="M64,30l16,16H68a4,4 0 0 1 -4,-4z" />
-    <!-- Text lines -->
-    <path
-        android:strokeColor="#3A322E"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:pathData="M44,56h26 M44,64h26 M44,72h16" />
+<!-- Flat sunflower glyph (matches the launcher icon) used for the launcher foreground & splash. -->
+    <path android:fillColor="#FF4CA92F" android:pathData="M51,55 h6 v31 a3,3 0 0 1 -6,0 z" />
+    <path android:fillColor="#FF5FB52F" android:pathData="M54,74 C44,66 30,66 26,72 C30,82 44,84 54,80 z" />
+    <path android:fillColor="#FF5FB52F" android:pathData="M54,74 C64,66 78,66 82,72 C78,82 64,84 54,80 z" />
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="0.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="30.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="60.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="90.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="120.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="150.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="180.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="210.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="240.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="270.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="300.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <group android:pivotX="54.0" android:pivotY="44.0" android:rotation="330.0">
+        <path android:fillColor="#FFFBBF1F" android:pathData="M48.5,25.0 a5.5,12.5 0 1,0 11.0,0 a5.5,12.5 0 1,0 -11.0,0 z" />
+    </group>
+    <path android:fillColor="#FF5A3A1E" android:pathData="M43.0,44.0 a11.0,11.0 0 1,0 22.0,0 a11.0,11.0 0 1,0 -22.0,0 z" />
 </vector>
