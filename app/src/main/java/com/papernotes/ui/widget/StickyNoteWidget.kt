@@ -16,6 +16,8 @@ import com.papernotes.MainActivity
 import com.papernotes.PaperNotesApp
 import com.papernotes.R
 import com.papernotes.domain.model.MoodCategory
+import com.papernotes.domain.model.Note
+import com.papernotes.domain.model.NoteType
 import com.papernotes.domain.toShareBody
 import com.papernotes.reminder.ReminderReceiver
 import com.papernotes.ui.theme.Espresso
@@ -77,13 +79,19 @@ object StickyNoteWidgets {
                 views.setTextViewText(R.id.widget_title, note.title)
                 views.setTextColor(R.id.widget_title, ink)
             }
-            val body = note.toShareBody()
-            if (body.isBlank()) {
+            if (note.type == NoteType.CHECKLIST && note.checklist.isNotEmpty()) {
+                // Checkliste: antippbare ☐/☑-Zeilen statt Fließtext-Zusammenfassung.
                 views.setViewVisibility(R.id.widget_body, View.GONE)
+                renderChecklist(context, views, note, appWidgetId, inkColor)
             } else {
-                views.setViewVisibility(R.id.widget_body, View.VISIBLE)
-                views.setTextViewText(R.id.widget_body, body)
-                views.setTextColor(R.id.widget_body, ink)
+                val body = note.toShareBody()
+                if (body.isBlank()) {
+                    views.setViewVisibility(R.id.widget_body, View.GONE)
+                } else {
+                    views.setViewVisibility(R.id.widget_body, View.VISIBLE)
+                    views.setTextViewText(R.id.widget_body, body)
+                    views.setTextColor(R.id.widget_body, ink)
+                }
             }
         }
 
@@ -112,6 +120,55 @@ object StickyNoteWidgets {
             "StickyWidget",
             "rendered id=$appWidgetId noteId=$noteId palette=$palette note=${note?.id}",
         )
+    }
+
+    private val ITEM_IDS = intArrayOf(
+        R.id.widget_item_0, R.id.widget_item_1, R.id.widget_item_2,
+        R.id.widget_item_3, R.id.widget_item_4, R.id.widget_item_5,
+    )
+
+    /**
+     * Bis zu [ITEM_IDS.size] feste Checklisten-Zeilen; Überhang wird als „+N weitere"
+     * angedeutet. Pro Zeile ein Broadcast an den [WidgetActionReceiver] – die eindeutige
+     * Data-URI hält die PendingIntents derselben Instanz auseinander.
+     */
+    private fun renderChecklist(
+        context: Context,
+        views: RemoteViews,
+        note: Note,
+        appWidgetId: Int,
+        inkColor: Color,
+    ) {
+        val items = note.checklist
+        val ink = inkColor.toArgb()
+        val dimmed = inkColor.copy(alpha = 0.55f).toArgb()
+        ITEM_IDS.forEachIndexed { index, viewId ->
+            if (index >= items.size) return@forEachIndexed
+            val item = items[index]
+            views.setViewVisibility(viewId, View.VISIBLE)
+            views.setTextViewText(viewId, (if (item.checked) "☑  " else "☐  ") + item.text)
+            views.setTextColor(viewId, if (item.checked) dimmed else ink)
+            val toggleIntent = Intent(context, WidgetActionReceiver::class.java).apply {
+                action = WidgetActionReceiver.ACTION_TOGGLE_ITEM
+                data = Uri.parse("papernotes://widget/$appWidgetId/toggle/$index")
+                putExtra(WidgetActionReceiver.EXTRA_NOTE_ID, note.id)
+                putExtra(WidgetActionReceiver.EXTRA_ITEM_INDEX, index)
+            }
+            views.setOnClickPendingIntent(
+                viewId,
+                PendingIntent.getBroadcast(
+                    context,
+                    appWidgetId,
+                    toggleIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+        }
+        if (items.size > ITEM_IDS.size) {
+            views.setViewVisibility(R.id.widget_more, View.VISIBLE)
+            views.setTextViewText(R.id.widget_more, "+${items.size - ITEM_IDS.size} weitere")
+            views.setTextColor(R.id.widget_more, dimmed)
+        }
     }
 
     /** Eine Instanz neu rendern (z. B. nach der Konfiguration). */

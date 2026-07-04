@@ -118,6 +118,20 @@ interface NoteDao {
     @Query("DELETE FROM notes WHERE deletedAt IS NOT NULL AND deletedAt < :cutoff")
     suspend fun purgeTrash(cutoff: Long)
 
+    // --- Batch-Operationen (Mehrfachauswahl im Grid) ---
+
+    @Query("UPDATE notes SET deletedAt = :now, expiresAt = NULL, clipId = NULL WHERE id IN (:ids)")
+    suspend fun moveToTrashMany(ids: List<Long>, now: Long)
+
+    @Query("UPDATE notes SET archived = :archived, updatedAt = :now WHERE id IN (:ids)")
+    suspend fun setArchivedMany(ids: List<Long>, archived: Boolean, now: Long)
+
+    @Query("UPDATE notes SET pinned = :pinned, updatedAt = :now WHERE id IN (:ids)")
+    suspend fun setPinnedMany(ids: List<Long>, pinned: Boolean, now: Long)
+
+    @Query("UPDATE notes SET dogEarFolded = 1, mood = :mood, updatedAt = :now WHERE id IN (:ids)")
+    suspend fun setMoodMany(ids: List<Long>, mood: String, now: Long)
+
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun delete(id: Long)
 

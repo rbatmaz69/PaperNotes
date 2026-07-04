@@ -42,6 +42,11 @@ interface NoteRepository {
     suspend fun notesWithCapsules(): List<Note>
     suspend fun moveToTrash(id: Long)
     suspend fun restore(id: Long)
+    suspend fun moveToTrashMany(ids: List<Long>)
+    suspend fun archiveMany(ids: List<Long>)
+    suspend fun setPinnedMany(ids: List<Long>, pinned: Boolean)
+    suspend fun setMoodMany(ids: List<Long>, mood: MoodCategory)
+    suspend fun addTagMany(ids: List<Long>, tag: String)
     suspend fun purgeOldTrash()
     suspend fun delete(id: Long)
     fun observeLinks(): Flow<List<NoteLink>>
@@ -137,6 +142,27 @@ class NoteRepositoryImpl @Inject constructor(
 
     override suspend fun restore(id: Long) =
         dao.restore(id, System.currentTimeMillis())
+
+    override suspend fun moveToTrashMany(ids: List<Long>) =
+        dao.moveToTrashMany(ids, System.currentTimeMillis())
+
+    override suspend fun archiveMany(ids: List<Long>) =
+        dao.setArchivedMany(ids, archived = true, now = System.currentTimeMillis())
+
+    override suspend fun setPinnedMany(ids: List<Long>, pinned: Boolean) =
+        dao.setPinnedMany(ids, pinned, System.currentTimeMillis())
+
+    override suspend fun setMoodMany(ids: List<Long>, mood: MoodCategory) =
+        dao.setMoodMany(ids, mood.name, System.currentTimeMillis())
+
+    override suspend fun addTagMany(ids: List<Long>, tag: String) {
+        // Additiv je Notiz (Tags sind ein zusammengesetztes Feld, kein reines Spalten-Update).
+        val now = System.currentTimeMillis()
+        ids.forEach { id ->
+            val note = dao.getById(id)?.toDomain() ?: return@forEach
+            if (tag !in note.tagList) dao.setTags(id, note.withTags(note.tagList + tag).tags, now)
+        }
+    }
 
     override suspend fun purgeOldTrash() {
         dao.purgeTrash(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30))

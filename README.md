@@ -36,6 +36,11 @@ Muji-Ruhe trifft Material 3 — minimal, aber an allen richtigen Stellen verspie
 - **Knüddeln & Papierkorb:** Löschen **zerknüllt** die Karte zu einer Papierkugel und wirft sie
   in den Korb — dort wartet sie 30 Tage und lässt sich per Tap wieder **glattstreichen**
   ([`CrumpleOverlay`](app/src/main/java/com/papernotes/ui/components/CrumpleOverlay.kt)).
+- **Glattstreichen-Streifen:** nach dem Zerknüllen oder Archivieren lugt kurz ein Papierstreifen
+  hervor — ein Tap macht die letzte Aktion **rückgängig**
+  ([`PaperSnackbar`](app/src/main/java/com/papernotes/ui/components/PaperSnackbar.kt)).
+- **Radiergummi & Durchschlag:** im Editor lassen sich Text-, Rückseiten-, Marker- und
+  Checklisten-Änderungen **rückgängig machen und wiederholen** (Undo/Redo).
 - **Washi-Tape:** Lieblingszettel mit einem schief geklebten Streifen oben anpinnen.
 - **Roter Faden:** zwei Notizen verknüpfen — ein Garn spannt sich zwischen ihnen, hängt durch
   und **atmet** ([`RedThreadOverlay`](app/src/main/java/com/papernotes/ui/components/RedThreadOverlay.kt)).
@@ -49,6 +54,8 @@ Muji-Ruhe trifft Material 3 — minimal, aber an allen richtigen Stellen verspie
 - **Erinnerungen — jetzt wiederkehrend:** einmalig, **täglich, werktags oder wöchentlich.**
   Fällige Notizen *flattern* sanft, der Papier-Reiter trägt bei Wiederholung ein „↻"
   ([`ReminderRule`](app/src/main/java/com/papernotes/domain/model/ReminderRule.kt)).
+- **Schlummern:** direkt aus der Benachrichtigung um **+10 Minuten oder +1 Stunde** vertagen —
+  wiederkehrende Serien bleiben davon unberührt.
 - **🕯️ Zeitkapsel:** eine Notiz mit Wachs versiegeln **und** ein Öffnungsdatum setzen — sie
   bleibt verschlossen (Tap zeigt nur „Versiegelt bis …"), und am Tag X **bricht das Siegel von
   selbst** auf und meldet sich: *„Ein Brief hat sich geöffnet."*
@@ -66,7 +73,8 @@ Muji-Ruhe trifft Material 3 — minimal, aber an allen richtigen Stellen verspie
 - **Schnellzettel:** App-Icon lang drücken → **„Neuer Zettel"** und sofort losschreiben.
 - **🪟 Haftnotiz-Widget:** eine ausgewählte Notiz als echter Papierzettel auf dem Homescreen —
   **Farbe frei wählbar** (Stimmungsfarbe der Notiz oder ein festes Papier-Theme), Tippen öffnet
-  sie; aktualisiert sich nach dem Bearbeiten
+  sie; aktualisiert sich nach dem Bearbeiten. **Checklisten sind direkt im Widget abhakbar**
+  (bis zu 6 Zeilen, Überhang als „+N weitere")
   ([`StickyNoteWidget`](app/src/main/java/com/papernotes/ui/widget/StickyNoteWidget.kt)).
 - **Foto-Polaroid:** ein Bild anheften — es klebt als kleines Polaroid auf der Karte.
 - **Sicherung:** alle Notizen (samt Fotos & Fäden) in eine ZIP exportieren und wieder
@@ -75,7 +83,15 @@ Muji-Ruhe trifft Material 3 — minimal, aber an allen richtigen Stellen verspie
 ### 🗂️ Ordnung & Bewegung
 - **Schreibtisch-Agenda:** alles mit Termin/Erinnerung/Ablauf auf einen Blick.
 - **Anordnen-Modus:** Karten frei umsortieren — sie *wackeln* übermütig dabei.
-- **Tinten-Suche:** Lupe antippen; Nicht-Treffer **verblassen wie verdünnte Tinte.**
+- **Sortierung:** Pinnwand (frei angeordnet), zuletzt erstellt oder Titel A–Z — Washi-Tape-Zettel
+  bleiben immer oben ([`SortSheet`](app/src/main/java/com/papernotes/ui/components/SortSheet.kt)).
+- **Mehrfachauswahl:** Karte **gedrückt halten** → ausgewählte Zettel bekommen eine kleine rote
+  Heftzwecke und lassen sich gesammelt anheften, umfärben, taggen, archivieren oder zerknüllen
+  ([`SelectionBar`](app/src/main/java/com/papernotes/ui/components/SelectionBar.kt)).
+- **Tinten-Suche:** Lupe antippen; findet auch **Karteireiter und Rückseiten**; Nicht-Treffer
+  **verblassen wie verdünnte Tinte.**
+- **Einstellungen-Zettel:** Papier-Theme, Sicherung und „Über" gebündelt in einem Sheet
+  ([`SettingsSheet`](app/src/main/java/com/papernotes/ui/components/SettingsSheet.kt)).
 - **Gesten:** Wisch-zum-Archivieren, Pinch-to-Zoom für die Spaltenzahl, schwebende Schatten.
 - **Erledigt-Stempel:** fertige Notizen schräg abstempeln, statt sie zu löschen.
 - **Haptik:** feine Ticks, ein satter „Thunk" beim Stempeln, Knister beim Knüllen.

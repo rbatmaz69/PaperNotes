@@ -14,12 +14,13 @@ import javax.inject.Singleton
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
-/** App-Einstellungen (persistiert): aktuell das gewählte Papier-Theme. */
+/** App-Einstellungen (persistiert): gewähltes Papier-Theme und Sortier-Modus. */
 @Singleton
 class SettingsPreferences @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     private val themeKeyPref = stringPreferencesKey("paper_theme")
+    private val sortModeKeyPref = stringPreferencesKey("sort_mode")
 
     /** Schlüssel des gewählten [com.papernotes.ui.theme.PaperTheme] (Default: AUTO). */
     val themeKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
@@ -28,5 +29,14 @@ class SettingsPreferences @Inject constructor(
 
     suspend fun setThemeKey(key: String) {
         context.settingsDataStore.edit { it[themeKeyPref] = key }
+    }
+
+    /** Schlüssel des Grid-Sortier-Modus (Default: PINNWAND = freie Anordnung). */
+    val sortModeKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[sortModeKeyPref] ?: "PINNWAND"
+    }
+
+    suspend fun setSortModeKey(key: String) {
+        context.settingsDataStore.edit { it[sortModeKeyPref] = key }
     }
 }

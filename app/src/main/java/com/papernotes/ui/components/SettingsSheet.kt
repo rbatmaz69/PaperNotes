@@ -10,11 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.FileOpen
@@ -25,10 +24,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,20 +37,26 @@ import com.papernotes.ui.theme.PaperTheme
 import com.papernotes.util.rememberPaperHaptics
 
 /**
- * Bottom-Sheet zur Theme-Wahl: ein Raster aus Papier-Swatches. AUTO erscheint als
- * geteilter Hell/Dunkel-Kreis. Auswahl wirkt sofort app-weit.
+ * Der „Einstellungen-Zettel": bündelt Papier-Theme, Sicherung und ein paar Zeilen
+ * über die App in einem Bottom-Sheet – die App hat bewusst keinen Settings-Screen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ThemePickerSheet(
-    selected: PaperTheme,
-    onPick: (PaperTheme) -> Unit,
-    onDismiss: () -> Unit,
+fun SettingsSheet(
+    selectedTheme: PaperTheme,
+    onPickTheme: (PaperTheme) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val haptics = rememberPaperHaptics()
     val ink = MaterialTheme.colorScheme.onBackground
+    val context = LocalContext.current
+    val versionName = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull() ?: "?"
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -58,30 +65,37 @@ fun ThemePickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Papier wählen",
+                text = "Einstellungen",
                 style = MaterialTheme.typography.titleLarge,
                 color = ink,
             )
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                items(PaperTheme.selectable, key = { it.name }) { theme ->
-                    ThemeSwatch(
-                        theme = theme,
-                        selected = theme == selected,
-                        onClick = {
-                            haptics.tap()
-                            onPick(theme)
-                        },
-                    )
+            Text(
+                text = "Papier wählen",
+                style = MaterialTheme.typography.titleMedium,
+                color = ink,
+            )
+            // Kein Lazy-Grid: die Column scrollt bereits, feste Reihen genügen.
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                PaperTheme.selectable.chunked(4).forEach { rowThemes ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        rowThemes.forEach { theme ->
+                            ThemeSwatch(
+                                theme = theme,
+                                selected = theme == selectedTheme,
+                                onClick = {
+                                    haptics.tap()
+                                    onPickTheme(theme)
+                                },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -89,7 +103,6 @@ fun ThemePickerSheet(
                 text = "Sicherung",
                 style = MaterialTheme.typography.titleMedium,
                 color = ink,
-                modifier = Modifier.padding(top = 8.dp),
             )
             BackupRow(icon = Icons.Rounded.Save, label = "Sichern") {
                 haptics.tap()
@@ -98,6 +111,25 @@ fun ThemePickerSheet(
             BackupRow(icon = Icons.Rounded.FileOpen, label = "Importieren") {
                 haptics.tap()
                 onImport()
+            }
+
+            Text(
+                text = "Über",
+                style = MaterialTheme.typography.titleMedium,
+                color = ink,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "PaperNotes · Ausgabe $versionName",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ink,
+                )
+                Text(
+                    text = "Aus Papier, Tinte und ein bisschen Konfetti gefaltet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
             }
         }
     }

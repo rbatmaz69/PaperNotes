@@ -39,6 +39,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Redo
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.BorderColor
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.FlipToBack
@@ -177,6 +179,8 @@ fun EditorScreen(
     val linkedNotes by viewModel.linkedNotes.collectAsStateWithLifecycle()
     val candidateNotes by viewModel.candidateNotes.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    val canUndo by viewModel.canUndo.collectAsStateWithLifecycle()
+    val canRedo by viewModel.canRedo.collectAsStateWithLifecycle()
 
     var showMood by remember { mutableStateOf(false) }
     var showTags by remember { mutableStateOf(false) }
@@ -299,6 +303,32 @@ fun EditorScreen(
                             )
                         }
                       } else {
+                        // Radiergummi & Durchschlag: Schritt zurück / wieder vor.
+                        // Erscheinen erst, wenn es etwas rückgängig zu machen gibt.
+                        if (canUndo) {
+                            IconButton(onClick = {
+                                haptics.tick()
+                                viewModel.undo()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.Undo,
+                                    contentDescription = "Rückgängig",
+                                    tint = ink,
+                                )
+                            }
+                        }
+                        if (canRedo) {
+                            IconButton(onClick = {
+                                haptics.tick()
+                                viewModel.redo()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.Redo,
+                                    contentDescription = "Wiederholen",
+                                    tint = ink,
+                                )
+                            }
+                        }
                         // Textmarker: Farbleiste ein-/ausblenden (nur für Text-Notizen).
                         if (note.type == NoteType.TEXT && !showingBack) {
                             IconButton(onClick = {

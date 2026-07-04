@@ -54,6 +54,24 @@ class ReminderScheduler @Inject constructor(
         alarmManager.cancel(capsuleIntent(noteId, mutableUpdate = false))
     }
 
+    /**
+     * Einmaliger Zusatz-Alarm fürs Snoozen einer wiederkehrenden Erinnerung: eigene Action,
+     * damit der bereits auf den nächsten Termin vorgerückte Serien-Alarm unberührt bleibt.
+     * Bewusst nicht persistiert – überlebt keinen Reboot (akzeptierter Trade-off).
+     */
+    fun scheduleSnooze(noteId: Long, title: String, triggerAtMillis: Long) {
+        if (!canScheduleExact()) return
+        alarmManager.setExactAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            triggerAtMillis,
+            snoozeIntent(noteId, title, mutableUpdate = true),
+        )
+    }
+
+    fun cancelSnooze(noteId: Long) {
+        alarmManager.cancel(snoozeIntent(noteId, "", mutableUpdate = false))
+    }
+
     /** Räumt eine bereits angezeigte Erinnerungs-Notification weg (Quittieren beim Öffnen). */
     fun dismissNotification(noteId: Long) {
         NotificationManagerCompat.from(context).cancel(noteId.toInt())
@@ -82,6 +100,15 @@ class ReminderScheduler @Inject constructor(
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             action = ReminderReceiver.ACTION_CAPSULE
             putExtra(ReminderReceiver.EXTRA_NOTE_ID, noteId)
+        }
+        return broadcast(noteId, intent, mutableUpdate)
+    }
+
+    private fun snoozeIntent(noteId: Long, title: String, mutableUpdate: Boolean): PendingIntent {
+        val intent = Intent(context, ReminderReceiver::class.java).apply {
+            action = ReminderReceiver.ACTION_SNOOZE_FIRE
+            putExtra(ReminderReceiver.EXTRA_NOTE_ID, noteId)
+            putExtra(ReminderReceiver.EXTRA_NOTE_TITLE, title)
         }
         return broadcast(noteId, intent, mutableUpdate)
     }

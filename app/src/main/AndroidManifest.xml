@@ -44,6 +44,8 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.papernotes.reminder.ACTION_REMIND" />
+                <action android:name="com.papernotes.reminder.ACTION_SNOOZE" />
+                <action android:name="com.papernotes.reminder.ACTION_SNOOZE_FIRE" />
             </intent-filter>
         </receiver>
 
@@ -58,6 +60,11 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/sticky_note_widget_info" />
         </receiver>
+
+        <!-- Checklisten-Taps aus dem Haftnotiz-Widget -->
+        <receiver
+            android:name=".ui.widget.WidgetActionReceiver"
+            android:exported="false" />
 
         <activity
             android:name=".ui.widget.StickyNoteConfigActivity"

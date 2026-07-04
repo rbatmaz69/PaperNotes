@@ -98,6 +98,88 @@ class EditorViewModel @Inject constructor(
     private var saveJob: Job? = null
     private var nextUiId = 1L
 
+    // --- Undo/Redo (Text, Rückseite, Textmarker, Checkliste) ---
+    // Snapshot-basiert: vor jeder Mutation wird der alte Zustand gesichert; schnelle
+    // Tastenanschläge im selben Feld werden zu einem Schritt gruppiert. Skizzen behalten
+    // ihr eigenes undoStroke(), Stempel sind per erneutem Tipp trivial reversibel.
+
+    private data class EditorSnapshot(
+        val title: String,
+        val body: String,
+        val backText: String,
+        val highlights: List<Highlight>,
+        val items: List<EditableChecklistItem>,
+    )
+
+    private enum class EditField { TITLE, BODY, BACK, HIGHLIGHT, CHECKLIST }
+
+    private val undoStack = ArrayDeque<EditorSnapshot>()
+    private val redoStack = ArrayDeque<EditorSnapshot>()
+    private val _canUndo = MutableStateFlow(false)
+    val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
+    private val _canRedo = MutableStateFlow(false)
+    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
+    private var lastSnapshotAt = 0L
+    private var lastEditedField: EditField? = null
+
+    private fun currentSnapshot() = EditorSnapshot(
+        title = _note.value.title,
+        body = _note.value.body,
+        backText = _note.value.backText,
+        highlights = _note.value.highlightRanges,
+        items = _items.value,
+    )
+
+    private fun recordSnapshot(field: EditField, group: Boolean = true) {
+        val now = System.currentTimeMillis()
+        if (group && field == lastEditedField && now - lastSnapshotAt <= 800 && undoStack.isNotEmpty()) {
+            lastSnapshotAt = now
+            return
+        }
+        undoStack.addLast(currentSnapshot())
+        while (undoStack.size > 50) undoStack.removeFirst()
+        redoStack.clear()
+        lastEditedField = field
+        lastSnapshotAt = now
+        updateUndoState()
+    }
+
+    fun undo() {
+        val snapshot = undoStack.removeLastOrNull() ?: return
+        redoStack.addLast(currentSnapshot())
+        applySnapshot(snapshot)
+    }
+
+    fun redo() {
+        val snapshot = redoStack.removeLastOrNull() ?: return
+        undoStack.addLast(currentSnapshot())
+        applySnapshot(snapshot)
+    }
+
+    private fun applySnapshot(s: EditorSnapshot) {
+        _note.update {
+            it.copy(title = s.title, body = s.body, backText = s.backText)
+                .withHighlights(s.highlights)
+        }
+        _items.value = s.items
+        lastEditedField = null
+        updateUndoState()
+        scheduleSave()
+    }
+
+    private fun updateUndoState() {
+        _canUndo.value = undoStack.isNotEmpty()
+        _canRedo.value = redoStack.isNotEmpty()
+    }
+
+    private fun resetHistory() {
+        undoStack.clear()
+        redoStack.clear()
+        lastEditedField = null
+        lastSnapshotAt = 0L
+        updateUndoState()
+    }
+
     /**
      * Lädt eine bestehende Notiz (id > 0) oder startet eine leere. [session] kommt vom NavGraph
      * und steigt bei *jedem* Öffnen — so wird der (Activity-weit geteilte) ViewModel-Zustand bei
@@ -121,11 +203,14 @@ class EditorViewModel @Inject constructor(
         _focusRequest.value = null
         _items.value = emptyList()
         _strokes.value = emptyList()
+        resetHistory()
         currentId.value = if (id > 0L) id else 0L
 
         if (id <= 0L) {
             _note.value = Note(type = newType, title = initialTitle, body = initialBody)
             if (newType == NoteType.CHECKLIST) addItem()
+            // Der Start-Zustand (inkl. erster Leerzeile) ist kein Undo-Schritt.
+            resetHistory()
             // Eingeklebter Inhalt soll sofort gespeichert werden (nicht erst nach Eingabe).
             if (initialTitle.isNotBlank() || initialBody.isNotBlank()) scheduleSave()
             return
@@ -139,6 +224,8 @@ class EditorViewModel @Inject constructor(
                 val nowMs = System.currentTimeMillis()
                 if (note.isReminderDue(nowMs)) {
                     reminderScheduler.dismissNotification(id)
+                    // Ein evtl. geschlummerter Zusatz-Alarm ist mit dem Öffnen quittiert.
+                    reminderScheduler.cancelSnooze(id)
                     if (note.isRecurring) {
                         var next = note.reminderRule.next(note.reminderAt!!)
                         while (next <= nowMs) next = note.reminderRule.next(next)
@@ -161,11 +248,13 @@ class EditorViewModel @Inject constructor(
     }
 
     fun onTitleChange(value: String) {
+        recordSnapshot(EditField.TITLE)
         _note.update { it.copy(title = value) }
         scheduleSave()
     }
 
     fun onBodyChange(value: String) {
+        recordSnapshot(EditField.BODY)
         _note.update { note ->
             // Textmarker-Markierungen beim Editieren mitverschieben.
             val shifted = shiftHighlights(note.body, value, note.highlightRanges)
@@ -177,6 +266,7 @@ class EditorViewModel @Inject constructor(
     /** Markiert die Auswahl [start, end) farbig – oder entfernt sie, wenn sie bereits markiert ist. */
     fun applyHighlight(start: Int, end: Int, color: Int) {
         if (end <= start) return
+        recordSnapshot(EditField.HIGHLIGHT, group = false)
         _note.update { note ->
             val ranges = note.highlightRanges
             val next = if (isCovered(ranges, start, end)) {
@@ -191,6 +281,7 @@ class EditorViewModel @Inject constructor(
 
     /** Text auf der Rückseite des Blatts (unabhängig vom Notiz-Typ der Vorderseite). */
     fun onBackChange(value: String) {
+        recordSnapshot(EditField.BACK)
         _note.update { it.copy(backText = value) }
         scheduleSave()
     }
@@ -303,11 +394,13 @@ class EditorViewModel @Inject constructor(
     // --- Checkliste ---
 
     fun setItemText(uiId: Long, text: String) {
+        recordSnapshot(EditField.CHECKLIST)
         _items.update { list -> list.map { if (it.uiId == uiId) it.copy(text = text) else it } }
         syncChecklistBody()
     }
 
     fun toggleItem(uiId: Long) {
+        recordSnapshot(EditField.CHECKLIST, group = false)
         val before = _items.value
         val target = before.firstOrNull { it.uiId == uiId } ?: return
         val nowChecked = !target.checked
@@ -330,6 +423,7 @@ class EditorViewModel @Inject constructor(
 
     /** Fügt eine leere Zeile hinter [afterUiId] (oder ans Ende des offenen Blocks) ein. */
     fun addItem(afterUiId: Long? = null) {
+        recordSnapshot(EditField.CHECKLIST, group = false)
         val newItem = EditableChecklistItem(uiId = nextUiId++, text = "", checked = false)
         _items.update { list ->
             val index = list.indexOfFirst { it.uiId == afterUiId }
@@ -349,6 +443,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun removeItem(uiId: Long) {
+        recordSnapshot(EditField.CHECKLIST, group = false)
         _items.update { list -> list.filter { it.uiId != uiId } }
         syncChecklistBody()
     }

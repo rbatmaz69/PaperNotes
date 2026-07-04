@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.papernotes.data.delight.DailyDelightProvider
 import com.papernotes.data.prefs.DelightPreferences
+import com.papernotes.data.prefs.SettingsPreferences
 import com.papernotes.data.repository.NoteRepository
 import com.papernotes.domain.StampCodec
 import com.papernotes.domain.model.DailyDelight
@@ -20,12 +21,33 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.Collator
 import java.time.LocalDate
 import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
+
+/**
+ * Sortierung des Grids. PINNWAND = die frei gezogene Reihenfolge (position-Spalte),
+ * die anderen sortieren automatisch; Washi-Tape-Zettel bleiben in allen Modi oben.
+ */
+enum class SortMode { PINNWAND, CREATED, TITLE }
+
+/** Rückgängig machbare Grid-Aktion für den Papierstreifen-Snackbar. */
+enum class UndoKind { TRASH, ARCHIVE }
+
+/** [id] ist ein laufender Zähler, damit ein neues Event den Auto-Dismiss-Timer neu startet. */
+data class UndoEvent(
+    val id: Long,
+    val message: String,
+    val actionLabel: String,
+    val kind: UndoKind,
+    val noteIds: List<Long>,
+)
 
 /** Notiz fürs Grid; [dimmed] = Nicht-Treffer von Suche/Stimmungs-Filter ("verdünnte Tinte"). */
 data class GridNote(
@@ -113,6 +135,7 @@ private fun groupIntoItems(notes: List<GridNote>): List<GridItem> {
 class NotesViewModel @Inject constructor(
     private val repository: NoteRepository,
     private val delightPreferences: DelightPreferences,
+    private val settingsPreferences: SettingsPreferences,
     private val reminderScheduler: ReminderScheduler,
     delightProvider: DailyDelightProvider,
 ) : ViewModel() {
@@ -127,15 +150,85 @@ class NotesViewModel @Inject constructor(
         viewModelScope.launch { repository.purgeOldTrash() }
         // Abgelaufene Notizen (während die App zu war) beim Start in den Papierkorb räumen.
         viewModelScope.launch { repository.purgeExpired() }
+        // Auswahl gegen die sichtbaren Notizen schneiden (z. B. nach Ablauf/Extern-Änderung).
+        viewModelScope.launch {
+            repository.observeActiveNotes().collect { notes ->
+                val visible = notes.mapTo(mutableSetOf()) { it.id }
+                _selectedIds.update { it intersect visible }
+            }
+        }
     }
+
+    // --- Mehrfachauswahl ---
+
+    private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedIds: StateFlow<Set<Long>> = _selectedIds
+
+    /** Toggelt die Auswahl; Stapel werden als Einheit gewählt/abgewählt. */
+    fun toggleSelected(item: GridItem) {
+        val ids = when (item) {
+            is SoloItem -> setOf(item.gridNote.note.id)
+            is StackItem -> item.members.mapTo(mutableSetOf()) { it.note.id }
+        }
+        _selectedIds.update { current -> if (ids.all { it in current }) current - ids else current + ids }
+    }
+
+    fun clearSelection() = _selectedIds.update { emptySet() }
+
+    fun archiveSelected() = viewModelScope.launch {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return@launch
+        clearSelection()
+        repository.archiveMany(ids)
+        pushUndo(UndoKind.ARCHIVE, ids)
+    }
+
+    fun trashSelected() = viewModelScope.launch {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return@launch
+        clearSelection()
+        repository.moveToTrashMany(ids)
+        pushUndo(UndoKind.TRASH, ids)
+    }
+
+    /** Mixed-State-Heuristik: ist irgendein gewählter Zettel ungepinnt, werden alle gepinnt. */
+    fun pinSelected() = viewModelScope.launch {
+        val selected = _selectedIds.value
+        if (selected.isEmpty()) return@launch
+        val notes = uiState.value.notes.map { it.note }.filter { it.id in selected }
+        repository.setPinnedMany(selected.toList(), pinned = notes.any { !it.pinned })
+    }
+
+    fun moodSelected(mood: MoodCategory) = viewModelScope.launch {
+        val ids = _selectedIds.value.toList()
+        if (ids.isNotEmpty()) repository.setMoodMany(ids, mood)
+    }
+
+    fun tagSelected(tag: String) = viewModelScope.launch {
+        val ids = _selectedIds.value.toList()
+        if (ids.isNotEmpty()) repository.addTagMany(ids, tag)
+    }
+
+    /** Persistierter Sortier-Modus (DataStore); unbekannte Werte fallen auf PINNWAND zurück. */
+    val sortMode: StateFlow<SortMode> = settingsPreferences.sortModeKey
+        .map { key -> runCatching { SortMode.valueOf(key) }.getOrDefault(SortMode.PINNWAND) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SortMode.PINNWAND)
+
+    fun setSortMode(mode: SortMode) = viewModelScope.launch {
+        settingsPreferences.setSortModeKey(mode.name)
+    }
+
+    // Mood + Tag vorab bündeln: combine() ist unten sonst am 5-Flow-Limit.
+    private val filterState = combine(moodFilter, tagFilter) { mood, tag -> mood to tag }
 
     private val gridState = combine(
         repository.observeActiveNotes(),
         searchQuery,
-        moodFilter,
-        tagFilter,
+        filterState,
+        sortMode,
         repository.observeLinks(),
-    ) { notes, query, mood, tag, links ->
+    ) { unsorted, query, (mood, tag), sort, links ->
+        val notes = sortNotes(unsorted, sort)
         val trimmed = query.trim()
         val gridNotes = notes.map { note ->
             // Versiegelte Notizen tauchen nicht in Suchtreffern auf (kein Inhalts-Leak),
@@ -143,7 +236,9 @@ class NotesViewModel @Inject constructor(
             val matchesQuery = trimmed.isEmpty() ||
                 (!note.sealed && (
                     note.title.contains(trimmed, ignoreCase = true) ||
-                        note.body.contains(trimmed, ignoreCase = true)
+                        note.body.contains(trimmed, ignoreCase = true) ||
+                        note.backText.contains(trimmed, ignoreCase = true) ||
+                        note.tagList.any { it.contains(trimmed, ignoreCase = true) }
                     ))
             val matchesMood = mood == null || note.mood == mood
             val matchesTag = tag == null || tag in note.tagList
@@ -200,6 +295,19 @@ class NotesViewModel @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = NotesUiState(delight = delight),
         )
+
+    /** Sortiert in-memory nach dem DAO-Order (pinned DESC, position ASC, updatedAt DESC). */
+    private fun sortNotes(notes: List<Note>, sort: SortMode): List<Note> = when (sort) {
+        SortMode.PINNWAND -> notes
+        SortMode.CREATED -> notes.sortedWith(
+            compareByDescending<Note> { it.pinned }.thenByDescending { it.createdAt },
+        )
+        SortMode.TITLE -> notes.sortedWith(
+            compareByDescending<Note> { it.pinned }
+                // Collator statt String-Vergleich, damit Umlaute korrekt einsortieren.
+                .then(compareBy(Collator.getInstance(Locale.GERMAN)) { it.title.ifBlank { it.preview } }),
+        )
+    }
 
     fun onSearchChange(query: String) = searchQuery.update { query }
 
@@ -354,11 +462,48 @@ class NotesViewModel @Inject constructor(
         }
     }
 
-    fun archive(id: Long) = viewModelScope.launch { repository.archive(id) }
+    fun archive(id: Long) = viewModelScope.launch {
+        repository.archive(id)
+        pushUndo(UndoKind.ARCHIVE, listOf(id))
+    }
 
     fun restore(id: Long) = viewModelScope.launch { repository.restore(id) }
 
-    fun moveToTrash(id: Long) = viewModelScope.launch { repository.moveToTrash(id) }
+    fun moveToTrash(id: Long) = viewModelScope.launch {
+        repository.moveToTrash(id)
+        pushUndo(UndoKind.TRASH, listOf(id))
+    }
+
+    // Undo-Streifen: merkt sich nur die letzte Aktion (simpel & robust); eine neue Aktion
+    // ersetzt das Event und startet den Auto-Dismiss-Timer über die neue Id neu.
+    private var undoCounter = 0L
+    private val _undoEvent = MutableStateFlow<UndoEvent?>(null)
+    val undoEvent: StateFlow<UndoEvent?> = _undoEvent
+
+    private fun pushUndo(kind: UndoKind, ids: List<Long>) {
+        val n = ids.size
+        val (message, action) = when (kind) {
+            UndoKind.TRASH ->
+                (if (n == 1) "Zettel zerknüllt" else "$n Zettel zerknüllt") to "Glattstreichen"
+            UndoKind.ARCHIVE ->
+                (if (n == 1) "In die Schublade gelegt" else "$n Zettel in die Schublade gelegt") to "Zurückholen"
+        }
+        _undoEvent.value = UndoEvent(++undoCounter, message, action, kind, ids)
+    }
+
+    fun undoLast() = viewModelScope.launch {
+        val event = _undoEvent.value ?: return@launch
+        _undoEvent.value = null
+        event.noteIds.forEach { id ->
+            when (event.kind) {
+                UndoKind.TRASH -> repository.restore(id)
+                // Bewusst unarchive statt restore: restore würde nebenbei expiresAt löschen.
+                UndoKind.ARCHIVE -> repository.unarchive(id)
+            }
+        }
+    }
+
+    fun dismissUndo(id: Long) = _undoEvent.update { if (it?.id == id) null else it }
 
     fun markDelightPulled() = viewModelScope.launch { delightPreferences.markPulledToday() }
 

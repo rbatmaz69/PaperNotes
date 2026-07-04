@@ -24,6 +24,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -50,8 +52,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -107,7 +109,10 @@ import com.papernotes.ui.components.DrawerHandle
 import com.papernotes.ui.components.ExpirySheet
 import com.papernotes.ui.components.InkSearchBar
 import com.papernotes.ui.components.MoodFilterRow
+import com.papernotes.ui.components.MoodOnlySheet
 import com.papernotes.ui.components.MoodPickerSheet
+import com.papernotes.ui.components.SelectionBar
+import com.papernotes.ui.components.SelectionPin
 import com.papernotes.ui.components.TagFilterRow
 import com.papernotes.ui.components.TagPickerSheet
 import com.papernotes.ui.components.ClipPickerSheet
@@ -119,11 +124,13 @@ import com.papernotes.ui.components.NoteStack
 import com.papernotes.ui.components.PaperBackground
 import com.papernotes.ui.components.PaperPlaneOverlay
 import com.papernotes.ui.components.PaperPlaneRequest
+import com.papernotes.ui.components.PaperSnackbar
+import com.papernotes.ui.components.SortSheet
 import com.papernotes.ui.components.RedThreadOverlay
 import com.papernotes.ui.components.paperPress
 import com.papernotes.ui.components.ReminderSheet
+import com.papernotes.ui.components.SettingsSheet
 import com.papernotes.ui.components.TeabagPull
-import com.papernotes.ui.components.ThemePickerSheet
 import com.papernotes.ui.components.WaxRed
 import com.papernotes.ui.components.WaxSealBreakOverlay
 import com.papernotes.ui.components.WaxSealBreakRequest
@@ -148,6 +155,8 @@ fun NotesScreen(
     themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val undoEvent by viewModel.undoEvent.collectAsStateWithLifecycle()
+    val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
     val currentTheme by themeViewModel.theme.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -266,7 +275,16 @@ fun NotesScreen(
     var reminderTarget by remember { mutableStateOf<Note?>(null) }
     var drawerOpen by remember { mutableStateOf(false) }
     var fabExpanded by remember { mutableStateOf(false) }
-    var themeSheetOpen by remember { mutableStateOf(false) }
+    var settingsSheetOpen by remember { mutableStateOf(false) }
+    var sortSheetOpen by remember { mutableStateOf(false) }
+
+    // Mehrfachauswahl: Long-Press auf eine Karte betritt den Modus, Tap toggelt weitere.
+    val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
+    val selectionMode = selectedIds.isNotEmpty()
+    var selectionMoodOpen by remember { mutableStateOf(false) }
+    var selectionTagOpen by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = selectionMode) { viewModel.clearSelection() }
 
     // Pinnwand: Anordnen-Modus zum freien Umsortieren der Karten.
     val haptics = rememberPaperHaptics()
@@ -495,6 +513,11 @@ fun NotesScreen(
                                             now = now,
                                             onClick = {
                                                 if (arrangeMode) return@NoteCard
+                                                if (selectionMode) {
+                                                    haptics.tick()
+                                                    viewModel.toggleSelected(item)
+                                                    return@NoteCard
+                                                }
                                                 when {
                                                     // Zeitkapsel: lässt sich vor dem Termin nicht öffnen.
                                                     note.isCapsuleLocked(now) -> {
@@ -516,11 +539,18 @@ fun NotesScreen(
                                                     else -> onOpenNote(note.id)
                                                 }
                                             },
-                                            onToggleDogEar = { if (!arrangeMode) viewModel.toggleDogEar(note) },
-                                            onPickMood = { if (!arrangeMode) moodTarget = note },
-                                            onLongPress = { if (!arrangeMode) viewModel.togglePin(note) },
-                                            onCountdown = { if (!arrangeMode) countdownTarget = note },
-                                            onToggleStampDay = { day -> if (!arrangeMode) viewModel.toggleStamp(note, day) },
+                                            onToggleDogEar = { if (!arrangeMode && !selectionMode) viewModel.toggleDogEar(note) },
+                                            onPickMood = { if (!arrangeMode && !selectionMode) moodTarget = note },
+                                            // Long-Press betritt die Mehrfachauswahl (Pinnen bleibt
+                                            // über das Eselsohr-Sheet und als Stapel-Aktion erreichbar).
+                                            onLongPress = {
+                                                if (!arrangeMode) {
+                                                    haptics.tick()
+                                                    viewModel.toggleSelected(item)
+                                                }
+                                            },
+                                            onCountdown = { if (!arrangeMode && !selectionMode) countdownTarget = note },
+                                            onToggleStampDay = { day -> if (!arrangeMode && !selectionMode) viewModel.toggleStamp(note, day) },
                                             modifier = Modifier
                                                 .graphicsLayer {
                                                     val a = appear.value
@@ -541,7 +571,9 @@ fun NotesScreen(
                                 }
                             }
 
-                            if (arrangeMode) {
+                            if (arrangeMode || selectionMode) {
+                                // Im Auswahlmodus keinen Swipe anbieten – ein versehentlicher
+                                // Wisch mitten in der Auswahl würde sonst archivieren.
                                 card()
                             } else {
                                 val dismissState = rememberSwipeToDismissBoxState(
@@ -581,15 +613,36 @@ fun NotesScreen(
                                 NoteStack(
                                     item = item,
                                     now = now,
-                                    onOpenNote = { if (!arrangeMode) onOpenNote(it) },
-                                    onToggleDogEar = { if (!arrangeMode) viewModel.toggleDogEar(it) },
-                                    onPickMood = { if (!arrangeMode) moodTarget = it },
-                                    onToggleStampDay = { n, day -> if (!arrangeMode) viewModel.toggleStamp(n, day) },
-                                    onUnclip = { if (!arrangeMode) viewModel.unclip(it) },
-                                    onCountdown = { if (!arrangeMode) countdownTarget = it },
+                                    // Im Auswahlmodus wählt ein Tap den ganzen Stapel als Einheit.
+                                    onOpenNote = {
+                                        if (selectionMode) {
+                                            haptics.tick()
+                                            viewModel.toggleSelected(item)
+                                        } else if (!arrangeMode) {
+                                            onOpenNote(it)
+                                        }
+                                    },
+                                    onToggleDogEar = { if (!arrangeMode && !selectionMode) viewModel.toggleDogEar(it) },
+                                    onPickMood = { if (!arrangeMode && !selectionMode) moodTarget = it },
+                                    onToggleStampDay = { n, day -> if (!arrangeMode && !selectionMode) viewModel.toggleStamp(n, day) },
+                                    onUnclip = { if (!arrangeMode && !selectionMode) viewModel.unclip(it) },
+                                    onCountdown = { if (!arrangeMode && !selectionMode) countdownTarget = it },
                                     modifier = Modifier,
                                 )
                             }
+                          }
+                          // Heftzwecken-Badge auf ausgewählten Karten/Stapeln.
+                          val itemSelected = when (item) {
+                              is SoloItem -> item.gridNote.note.id in selectedIds
+                              is StackItem -> item.members.all { it.note.id in selectedIds }
+                          }
+                          if (itemSelected) {
+                              SelectionPin(
+                                  modifier = Modifier
+                                      .align(Alignment.TopStart)
+                                      .padding(start = 8.dp, top = 2.dp)
+                                      .zIndex(2f),
+                              )
                           }
                           }
                         }
@@ -605,6 +658,33 @@ fun NotesScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
+            // Im Auswahlmodus ersetzt die Werkzeugleiste die oberen Bedienelemente.
+            if (selectionMode) {
+                SelectionBar(
+                    count = selectedIds.size,
+                    onClose = {
+                        haptics.tap()
+                        viewModel.clearSelection()
+                    },
+                    onPin = {
+                        haptics.tap()
+                        viewModel.pinSelected()
+                    },
+                    onArchive = {
+                        haptics.tap()
+                        viewModel.archiveSelected()
+                    },
+                    onTrash = {
+                        haptics.crumple()
+                        viewModel.trashSelected()
+                    },
+                    onMood = { selectionMoodOpen = true },
+                    onTag = { selectionTagOpen = true },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = contentPadding.calculateTopPadding() + 4.dp),
+                )
+            } else {
             // Sichtbare Bedienelemente oben: Suche + Design (links), Archiv (rechts).
             // Der Teebeutel bleibt mittig.
             Row(
@@ -619,9 +699,9 @@ fun NotesScreen(
                 )
                 Spacer(Modifier.width(8.dp))
                 TopAction(
-                    icon = Icons.Rounded.Palette,
-                    description = "Design wählen",
-                    onClick = { themeSheetOpen = true },
+                    icon = Icons.Rounded.Settings,
+                    description = "Einstellungen",
+                    onClick = { settingsSheetOpen = true },
                 )
                 Spacer(Modifier.width(8.dp))
                 TopAction(
@@ -637,10 +717,10 @@ fun NotesScreen(
             ) {
                 TopAction(
                     icon = Icons.Rounded.SwapVert,
-                    description = if (arrangeMode) "Anordnen beenden" else "Anordnen",
+                    description = if (arrangeMode) "Anordnen beenden" else "Ordnen",
                     onClick = {
                         haptics.tap()
-                        if (arrangeMode) finishArrange() else arrangeMode = true
+                        if (arrangeMode) finishArrange() else sortSheetOpen = true
                     },
                 )
                 Spacer(Modifier.width(8.dp))
@@ -661,10 +741,11 @@ fun NotesScreen(
                     .align(Alignment.TopCenter)
                     .padding(top = contentPadding.calculateTopPadding()),
             )
+            }
 
             // Schubladen-Lasche unten mittig (Archiv + Papierkorb) – zusätzlicher Einstieg.
-            // Im Anordnen-Modus weicht sie der „Fertig"-Pille.
-            if (!arrangeMode) {
+            // Im Anordnen-Modus weicht sie der „Fertig"-Pille, im Auswahlmodus der Werkzeugleiste.
+            if (!arrangeMode && !selectionMode) {
                 DrawerHandle(
                     archiveCount = state.archived.size,
                     trashCount = state.trashed.size,
@@ -673,7 +754,7 @@ fun NotesScreen(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = contentPadding.calculateBottomPadding() + 4.dp),
                 )
-            } else {
+            } else if (arrangeMode) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -703,8 +784,8 @@ fun NotesScreen(
                 )
             }
 
-            // Runder "+"-Button mit Fächer (Notiz / Checkliste) – im Anordnen-Modus ausgeblendet.
-            if (!arrangeMode) {
+            // Runder "+"-Button mit Fächer – im Anordnen- und Auswahlmodus ausgeblendet.
+            if (!arrangeMode && !selectionMode) {
                 AddFab(
                     expanded = fabExpanded,
                     onExpandedChange = { fabExpanded = it },
@@ -714,6 +795,36 @@ fun NotesScreen(
                         .padding(24.dp)
                         .padding(bottom = contentPadding.calculateBottomPadding()),
                 )
+            }
+
+            // Undo-Streifen: lugt nach Zerknüllen/Archivieren kurz aus dem Papierkorb hervor.
+            // lastUndo hält das Event für die Ausblend-Animation fest.
+            var lastUndo by remember { mutableStateOf<UndoEvent?>(null) }
+            if (undoEvent != null) lastUndo = undoEvent
+            AnimatedVisibility(
+                visible = undoEvent != null,
+                enter = slideInVertically { it * 2 } + fadeIn(),
+                exit = slideOutVertically { it * 2 } + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = contentPadding.calculateBottomPadding() + 56.dp),
+            ) {
+                lastUndo?.let { event ->
+                    PaperSnackbar(
+                        message = event.message,
+                        actionLabel = event.actionLabel,
+                        onAction = {
+                            haptics.tap()
+                            viewModel.undoLast()
+                        },
+                    )
+                }
+            }
+            undoEvent?.let { event ->
+                LaunchedEffect(event.id) {
+                    kotlinx.coroutines.delay(5000)
+                    viewModel.dismissUndo(event.id)
+                }
             }
         }
     }
@@ -987,20 +1098,68 @@ fun NotesScreen(
         )
     }
 
-    // Theme-Picker
-    if (themeSheetOpen) {
-        ThemePickerSheet(
-            selected = currentTheme,
-            onPick = { themeViewModel.setTheme(it) },
-            onDismiss = { themeSheetOpen = false },
+    // Ordnen: Sortierung wählen oder frei anordnen
+    if (sortSheetOpen) {
+        SortSheet(
+            selected = sortMode,
+            onPick = { mode ->
+                viewModel.setSortMode(mode)
+                sortSheetOpen = false
+            },
+            onArrange = {
+                // Freies Ziehen setzt die Sortierung auf Pinnwand zurück, sonst würde
+                // die aktive Auto-Sortierung die gezogene Reihenfolge sofort überstimmen.
+                viewModel.setSortMode(SortMode.PINNWAND)
+                viewModel.clearSelection()
+                arrangeMode = true
+                sortSheetOpen = false
+            },
+            onDismiss = { sortSheetOpen = false },
+        )
+    }
+
+    // Einstellungen-Zettel: Papier-Theme, Sicherung, Über
+    if (settingsSheetOpen) {
+        SettingsSheet(
+            selectedTheme = currentTheme,
+            onPickTheme = { themeViewModel.setTheme(it) },
+            onDismiss = { settingsSheetOpen = false },
             onExport = {
-                themeSheetOpen = false
+                settingsSheetOpen = false
                 createBackup.launch("papernotes-sicherung-${backupDateStamp()}.zip")
             },
             onImport = {
-                themeSheetOpen = false
+                settingsSheetOpen = false
                 openBackup.launch(arrayOf("application/zip"))
             },
+        )
+    }
+
+    // Stimmung für die Mehrfachauswahl (abgespeckte Farbreihe)
+    if (selectionMoodOpen) {
+        MoodOnlySheet(
+            onPick = { mood ->
+                viewModel.moodSelected(mood)
+                selectionMoodOpen = false
+            },
+            onDismiss = { selectionMoodOpen = false },
+        )
+    }
+
+    // Karteireiter für die Mehrfachauswahl (fügt den Tag allen gewählten Zetteln hinzu)
+    if (selectionTagOpen) {
+        TagPickerSheet(
+            noteTags = emptyList(),
+            allTags = state.presentTags,
+            onToggle = { tag ->
+                viewModel.tagSelected(tag)
+                selectionTagOpen = false
+            },
+            onAdd = { tag ->
+                viewModel.tagSelected(tag)
+                selectionTagOpen = false
+            },
+            onDismiss = { selectionTagOpen = false },
         )
     }
 
