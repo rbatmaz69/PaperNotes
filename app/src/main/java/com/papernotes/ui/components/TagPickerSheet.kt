@@ -1,5 +1,6 @@
 package com.papernotes.ui.components
 
+import com.papernotes.ui.theme.PaperDimens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -64,7 +65,7 @@ fun TagPickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = PaperDimens.sheetHPadding)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

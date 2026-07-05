@@ -1,5 +1,6 @@
 package com.papernotes.ui.components
 
+import com.papernotes.ui.theme.PaperDimens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -55,7 +56,7 @@ fun CapsuleSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = PaperDimens.sheetHPadding)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {

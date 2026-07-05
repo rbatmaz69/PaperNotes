@@ -14,4 +14,5 @@
     <string name="widget_description">Eine Haftnotiz auf dem Homescreen</string>
     <string name="hint_long_press">Tipp: Halte einen Zettel gedrückt, um mehrere auszuwählen.</string>
     <string name="hint_long_press_ok">Verstanden</string>
+    <string name="reminder_muted_hint">Benachrichtigungen sind aus – dieser Zettel bleibt stumm.</string>
 </resources>

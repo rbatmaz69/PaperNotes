@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.papernotes.domain.model.MoodCategory
@@ -107,23 +111,34 @@ fun TagFilterRow(
         presentTags.forEach { tag ->
             val isActive = tag == active
             val bg = tabColor(tag)
+            // Äußere Hitbox ≥36dp – die sichtbare Pill bleibt klein.
             Box(
                 modifier = Modifier
+                    .heightIn(min = 36.dp)
                     .paperPress(shape) { onToggle(tag) }
-                    .background(bg.copy(alpha = if (isActive) 1f else 0.35f), shape)
-                    .then(
-                        if (isActive) {
-                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.onBackground, shape)
-                        } else Modifier,
-                    )
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    .semantics {
+                        contentDescription = "Reiter $tag"
+                        this.selected = isActive
+                    },
+                contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = tag,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isActive) labelOn(bg) else MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                )
+                Box(
+                    modifier = Modifier
+                        .background(bg.copy(alpha = if (isActive) 1f else 0.35f), shape)
+                        .then(
+                            if (isActive) {
+                                Modifier.border(1.5.dp, MaterialTheme.colorScheme.onBackground, shape)
+                            } else Modifier,
+                        )
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = tag,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isActive) labelOn(bg) else MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

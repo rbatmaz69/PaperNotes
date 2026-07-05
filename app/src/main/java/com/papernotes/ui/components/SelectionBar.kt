@@ -145,7 +145,7 @@ fun MoodOnlySheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = PaperDimens.sheetHPadding)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {

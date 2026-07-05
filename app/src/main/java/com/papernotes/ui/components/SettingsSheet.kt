@@ -1,5 +1,6 @@
 package com.papernotes.ui.components
 
+import com.papernotes.ui.theme.PaperDimens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,7 +69,7 @@ fun SettingsSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = PaperDimens.sheetHPadding)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

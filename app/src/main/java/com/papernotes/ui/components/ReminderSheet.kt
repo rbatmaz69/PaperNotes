@@ -1,5 +1,6 @@
 package com.papernotes.ui.components
 
+import com.papernotes.ui.theme.PaperDimens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -33,8 +34,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import com.papernotes.R
 import com.papernotes.domain.model.ReminderRule
 import com.papernotes.ui.theme.Terracotta
 import java.text.SimpleDateFormat
@@ -67,7 +72,7 @@ fun ReminderSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = PaperDimens.sheetHPadding)
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -76,6 +81,20 @@ fun ReminderSheet(
                 style = MaterialTheme.typography.titleLarge,
                 color = ink,
             )
+
+            // Benachrichtigungen systemweit aus? Dann ehrlich sagen, dass der Wecker stumm
+            // bleibt – setzen darf man ihn trotzdem (die Agenda zeigt ihn ja).
+            val context = LocalContext.current
+            val notificationsOff = remember {
+                !NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
+            if (notificationsOff) {
+                Text(
+                    text = stringResource(R.string.reminder_muted_hint),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
 
             if (currentReminderAt != null) {
                 Text(

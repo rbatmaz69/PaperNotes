@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.background
@@ -415,6 +416,17 @@ fun NotesScreen(
                     }
                 } else {
                     val displayItems = if (arrangeMode) orderedItems else state.items
+                    // Suche/Filter aktiv, aber jede Karte verblasst → ehrlicher Hinweis statt
+                    // eines Grids voller blasser Tinte.
+                    val filtering = state.searchQuery.isNotBlank() ||
+                        state.activeMoodFilter != null || state.activeTagFilter != null
+                    if (filtering && state.notes.isNotEmpty() && state.notes.all { it.dimmed }) {
+                        NoMatchState(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 48.dp),
+                        )
+                    }
                     LazyVerticalStaggeredGrid(
                         columns = StaggeredGridCells.Fixed(columns),
                         modifier = Modifier
@@ -1263,6 +1275,29 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         )
         Text(
             text = "Tippe auf +, um deine erste Notiz zu schreiben.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.outline,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** Hinweis, wenn Suche/Filter keine einzige Notiz treffen – statt nur blasser Tinte. */
+@Composable
+private fun NoMatchState(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(text = "🫥", style = MaterialTheme.typography.displaySmall)
+        Text(
+            text = "Keine Notiz passt",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Text(
+            text = "Die Tinte bleibt blass – ändere Suche oder Filter.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.outline,
             textAlign = TextAlign.Center,
