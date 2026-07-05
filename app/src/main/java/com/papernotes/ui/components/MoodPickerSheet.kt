@@ -5,8 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -38,15 +41,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.papernotes.domain.model.MoodCategory
 import com.papernotes.domain.model.PaperStyle
 import com.papernotes.domain.model.earAccent
+import com.papernotes.ui.theme.PaperDimens
 import com.papernotes.ui.theme.Terracotta
 
 /**
- * Bottom-Sheet als Kontext-Menü einer Notiz: Stimmung (Eselsohr-Farbe) wählen,
- * mit Washi-Tape anheften/lösen, oder zerknüllen & löschen ([onDelete]).
+ * Bottom-Sheet als Kontext-Menü einer Notiz. Statt einer langen Liste sind die
+ * Aktionen in kleine Abschnitte gruppiert (Ordnen / Zeit / Extras / Teilen) und
+ * stehen paarweise nebeneinander – ein Zettel mit Rubriken, kein Menübaum.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,9 +100,9 @@ fun MoodPickerSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = PaperDimens.sheetHPadding)
                 .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text = "Stimmung",
@@ -111,6 +120,10 @@ fun MoodPickerSheet(
                         modifier = Modifier
                             .size(44.dp)
                             .paperPress(CircleShape) { onPick(mood) }
+                            .semantics {
+                                contentDescription = mood.label
+                                this.selected = isSelected
+                            }
                             .background(mood.earAccent(), CircleShape)
                             .then(
                                 if (isSelected) {
@@ -122,28 +135,28 @@ fun MoodPickerSheet(
             }
 
             // Papier-Liniierung wählen (Live-Vorschau je Swatch)
-            Text(
-                text = "Papier",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            SectionLabel("Papier")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 PaperStyle.entries.forEach { style ->
-                    val selected = style == paper
+                    val isSelected = style == paper
                     Box(
                         modifier = Modifier
                             .size(48.dp)
                             .paperPress(RoundedCornerShape(8.dp)) { onPickPaper(style) }
+                            .semantics {
+                                contentDescription = style.label
+                                this.selected = isSelected
+                            }
                             .background(
                                 MaterialTheme.colorScheme.surfaceVariant,
                                 RoundedCornerShape(8.dp),
                             )
                             .paperRuling(style, ink, spacing = 9.dp)
                             .then(
-                                if (selected) {
+                                if (isSelected) {
                                     Modifier.border(2.5.dp, ink, RoundedCornerShape(8.dp))
                                 } else Modifier,
                             ),
@@ -151,378 +164,220 @@ fun MoodPickerSheet(
                 }
             }
 
-            // Washi-Tape: anheften / lösen
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onTogglePin() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+            SectionLabel("Ordnen")
+            ActionPair(
+                first = {
+                    SheetAction(
+                        icon = Icons.Rounded.PushPin,
+                        label = if (pinned) "Washi-Tape lösen" else "Anheften",
+                        onClick = onTogglePin,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.PushPin,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (pinned) "Washi-Tape lösen" else "Mit Washi-Tape anheften",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Erinnerung setzen / ändern
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onSetReminder() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+                },
+                second = {
+                    SheetAction(
+                        icon = Icons.Rounded.LocalOffer,
+                        label = "Reiter / Tags",
+                        onClick = onEditTags,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.NotificationsActive,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (hasReminder) "Erinnerung ändern" else "Erinnerung setzen",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Abreißkalender / Countdown zu einem Tag
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onSetCountdown() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
-                    )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.CalendarMonth,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (hasCountdown) "Termin ändern" else "Countdown setzen",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Foto anhängen / ersetzen (Polaroid)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onAttachPhoto() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
-                    )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.AddAPhoto,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (hasPhoto) "Foto ersetzen" else "Foto anhängen",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Mit rotem Faden verknüpfen
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onLink() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
-                    )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Hub,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = "Mit rotem Faden verknüpfen",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // An Büroklammer-Stapel klammern (nur aus dem Raster)
+                },
+            )
             if (onClip != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .paperPress(RoundedCornerShape(14.dp)) { onClip() }
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant,
-                            RoundedCornerShape(14.dp),
+                ActionPair(
+                    first = {
+                        SheetAction(
+                            icon = Icons.Rounded.Hub,
+                            label = "Roter Faden",
+                            onClick = onLink,
+                            modifier = it,
                         )
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.AttachFile,
-                        contentDescription = null,
-                        tint = ink,
-                    )
-                    Text(
-                        text = "An Stapel klammern",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = ink,
-                    )
-                }
-            }
-
-            // Als Papierflieger teilen
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onShare() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
-                    )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.Send,
-                    contentDescription = null,
-                    tint = ink,
+                    },
+                    second = {
+                        SheetAction(
+                            icon = Icons.Rounded.AttachFile,
+                            label = "An Stapel klammern",
+                            onClick = onClip,
+                            modifier = it,
+                        )
+                    },
                 )
-                Text(
-                    text = "Als Papierflieger teilen",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
+            } else {
+                SheetAction(
+                    icon = Icons.Rounded.Hub,
+                    label = "Mit rotem Faden verknüpfen",
+                    onClick = onLink,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            // Text in die Zwischenablage kopieren
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onCopy() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+            SectionLabel("Zeit")
+            ActionPair(
+                first = {
+                    SheetAction(
+                        icon = Icons.Rounded.NotificationsActive,
+                        label = if (hasReminder) "Erinnerung ändern" else "Erinnerung setzen",
+                        onClick = onSetReminder,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.ContentCopy,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = "Text kopieren",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Mit Wachs versiegeln / Siegel entfernen
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onToggleSeal() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+                },
+                second = {
+                    SheetAction(
+                        icon = Icons.Rounded.CalendarMonth,
+                        label = if (hasCountdown) "Termin ändern" else "Countdown setzen",
+                        onClick = onSetCountdown,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Lock,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (sealed) "Siegel entfernen" else "Mit Wachs versiegeln",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Zeitkapsel: versiegeln bis zu einem Datum (öffnet sich dann von selbst)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onSetCapsule() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+                },
+            )
+            ActionPair(
+                first = {
+                    SheetAction(
+                        icon = Icons.Rounded.Schedule,
+                        label = if (hasCapsule) "Zeitkapsel ändern" else "Zeitkapsel",
+                        onClick = onSetCapsule,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Schedule,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (hasCapsule) "Zeitkapsel ändern" else "Als Zeitkapsel versiegeln",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Mit Geheimtinte schreiben / entfernen
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onToggleInvisibleInk() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+                },
+                second = {
+                    SheetAction(
+                        icon = Icons.Rounded.HourglassEmpty,
+                        label = if (hasExpiry) "Selbstzerstörung ändern" else "Vergänglich machen",
+                        onClick = onSetExpiry,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Whatshot,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (invisibleInk) "Geheimtinte entfernen" else "Mit Geheimtinte schreiben",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
+                },
+            )
 
-            // Als erledigt stempeln / Stempel entfernen
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onToggleDone() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+            SectionLabel("Extras")
+            ActionPair(
+                first = {
+                    SheetAction(
+                        icon = Icons.Rounded.Lock,
+                        label = if (sealed) "Siegel entfernen" else "Versiegeln",
+                        onClick = onToggleSeal,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.TaskAlt,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (done) "Stempel entfernen" else "Als erledigt stempeln",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Karteireiter / Tags verwalten
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onEditTags() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+                },
+                second = {
+                    SheetAction(
+                        icon = Icons.Rounded.Whatshot,
+                        label = if (invisibleInk) "Geheimtinte entfernen" else "Geheimtinte",
+                        onClick = onToggleInvisibleInk,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.LocalOffer,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = "Reiter / Tags",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
-
-            // Vergänglich machen / Selbstzerstörung ändern
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onSetExpiry() }
-                    .background(
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        RoundedCornerShape(14.dp),
+                },
+            )
+            ActionPair(
+                first = {
+                    SheetAction(
+                        icon = Icons.Rounded.TaskAlt,
+                        label = if (done) "Stempel entfernen" else "Erledigt stempeln",
+                        onClick = onToggleDone,
+                        modifier = it,
                     )
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.HourglassEmpty,
-                    contentDescription = null,
-                    tint = ink,
-                )
-                Text(
-                    text = if (hasExpiry) "Selbstzerstörung ändern" else "Vergänglich machen",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = ink,
-                )
-            }
+                },
+                second = {
+                    SheetAction(
+                        icon = Icons.Rounded.AddAPhoto,
+                        label = if (hasPhoto) "Foto ersetzen" else "Foto anhängen",
+                        onClick = onAttachPhoto,
+                        modifier = it,
+                    )
+                },
+            )
 
-            Row(
+            SectionLabel("Teilen")
+            ActionPair(
+                first = {
+                    SheetAction(
+                        icon = Icons.AutoMirrored.Rounded.Send,
+                        label = "Papierflieger",
+                        onClick = onShare,
+                        modifier = it,
+                    )
+                },
+                second = {
+                    SheetAction(
+                        icon = Icons.Rounded.ContentCopy,
+                        label = "Text kopieren",
+                        onClick = onCopy,
+                        modifier = it,
+                    )
+                },
+            )
+
+            SheetAction(
+                icon = Icons.Rounded.Delete,
+                label = "Zerknüllen & in den Papierkorb",
+                onClick = onDelete,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .paperPress(RoundedCornerShape(14.dp)) { onDelete() }
-                    .background(Terracotta.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Delete,
-                    contentDescription = null,
-                    tint = Color(0xFFC97B5F),
-                )
-                Text(
-                    text = "Zerknüllen & in den Papierkorb",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color(0xFFC97B5F),
-                )
-            }
+                    .padding(top = 8.dp),
+                tint = Color(0xFFC97B5F),
+                container = Terracotta.copy(alpha = 0.18f),
+            )
         }
+    }
+}
+
+/** Kleine Rubrik-Überschrift, wie eine Bleistift-Notiz am Rand. */
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.outline,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+/** Zwei halbbreite Aktionen nebeneinander, gleich hoch – halbiert die Scroll-Länge. */
+@Composable
+private fun ActionPair(
+    first: @Composable (Modifier) -> Unit,
+    second: @Composable (Modifier) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        first(Modifier.weight(1f).fillMaxHeight())
+        second(Modifier.weight(1f).fillMaxHeight())
+    }
+}
+
+/** Einheitliche Aktions-Zeile: Symbol + Beschriftung auf einem Papier-Plättchen. */
+@Composable
+private fun SheetAction(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onBackground,
+    container: Color = MaterialTheme.colorScheme.surfaceVariant,
+) {
+    val shape = RoundedCornerShape(PaperDimens.actionCorner)
+    Row(
+        modifier = modifier
+            .paperPress(shape) { onClick() }
+            .background(container, shape)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = tint,
+        )
     }
 }

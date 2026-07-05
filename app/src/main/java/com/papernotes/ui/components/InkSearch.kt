@@ -31,6 +31,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import com.papernotes.domain.model.MoodCategory
 import com.papernotes.domain.model.earAccent
 
@@ -56,7 +59,7 @@ fun InkSearchBar(
             .padding(horizontal = 24.dp)
             .shadow(6.dp, RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -81,14 +84,20 @@ fun InkSearchBar(
                 .weight(1f)
                 .focusRequester(focusRequester),
         )
-        Icon(
-            imageVector = Icons.Rounded.Close,
-            contentDescription = "Suche schließen",
-            tint = MaterialTheme.colorScheme.outline,
+        // Trefferfläche 44dp, das Symbol bleibt klein – große Zange, feiner Stift.
+        Box(
             modifier = Modifier
-                .size(20.dp)
+                .size(44.dp)
                 .paperPress(CircleShape) { onClose() },
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = "Suche schließen",
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 
@@ -107,7 +116,6 @@ fun MoodFilterRow(
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         presentMoods.forEach { mood ->
@@ -117,25 +125,36 @@ fun MoodFilterRow(
                 animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
                 label = "moodDot",
             )
+            // Trefferfläche 32dp um den kleinen Punkt; Semantik für Screenreader.
             Box(
                 modifier = Modifier
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    }
-                    .size(14.dp)
+                    .size(32.dp)
                     .paperPress(CircleShape) { onToggle(mood) }
-                    .background(mood.earAccent(), CircleShape)
-                    .then(
-                        if (isActive) {
-                            Modifier.border(
-                                1.5.dp,
-                                MaterialTheme.colorScheme.onBackground,
-                                CircleShape,
-                            )
-                        } else Modifier,
-                    ),
-            )
+                    .semantics {
+                        contentDescription = mood.label
+                        selected = isActive
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .size(14.dp)
+                        .background(mood.earAccent(), CircleShape)
+                        .then(
+                            if (isActive) {
+                                Modifier.border(
+                                    1.5.dp,
+                                    MaterialTheme.colorScheme.onBackground,
+                                    CircleShape,
+                                )
+                            } else Modifier,
+                        ),
+                )
+            }
         }
     }
 }

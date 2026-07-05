@@ -3,7 +3,9 @@ package com.papernotes.data.prefs
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -38,5 +40,25 @@ class SettingsPreferences @Inject constructor(
 
     suspend fun setSortModeKey(key: String) {
         context.settingsDataStore.edit { it[sortModeKeyPref] = key }
+    }
+
+    private val appOpensPref = intPreferencesKey("app_opens")
+    private val longPressHintSeenPref = booleanPreferencesKey("longpress_hint_seen")
+
+    /** Zählt die App-Starts hoch und liefert den neuen Stand (für einmalige Hinweise). */
+    suspend fun incrementAppOpens(): Int {
+        val prefs = context.settingsDataStore.edit {
+            it[appOpensPref] = (it[appOpensPref] ?: 0) + 1
+        }
+        return prefs[appOpensPref] ?: 0
+    }
+
+    /** true, sobald der Langdruck-Hinweis gezeigt oder die Auswahl selbst entdeckt wurde. */
+    val longPressHintSeen: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[longPressHintSeenPref] ?: false
+    }
+
+    suspend fun markLongPressHintSeen() {
+        context.settingsDataStore.edit { it[longPressHintSeenPref] = true }
     }
 }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -107,6 +108,7 @@ import com.papernotes.ui.components.StampMotifPicker
 import com.papernotes.ui.components.TagPickerSheet
 import com.papernotes.ui.components.paperPress
 import com.papernotes.ui.components.paperRuling
+import com.papernotes.ui.theme.PaperDimens
 import java.time.LocalDate
 import com.papernotes.util.PhotoStore
 import com.papernotes.util.ShareCardRenderer
@@ -257,10 +259,12 @@ fun EditorScreen(
                     )
                     .imePadding(),
             ) {
-                // Kopfzeile: Zurück + Eselsohr (Stimmung)
+                // Kopfzeile: Zurück + Eselsohr (Stimmung) – feste Höhe wie in der Übersicht,
+                // damit nichts springt, wenn Werkzeuge ein-/ausgeblendet werden.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(PaperDimens.topBarHeight)
                         .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -304,30 +308,45 @@ fun EditorScreen(
                         }
                       } else {
                         // Radiergummi & Durchschlag: Schritt zurück / wieder vor.
-                        // Erscheinen erst, wenn es etwas rückgängig zu machen gibt.
-                        if (canUndo) {
-                            IconButton(onClick = {
+                        // Immer komponiert, damit die Nachbar-Symbole nicht springen –
+                        // die Icons blenden nur ein/aus wie trocknende Tinte.
+                        val undoAlpha by animateFloatAsState(
+                            targetValue = if (canUndo) 1f else 0f,
+                            animationSpec = tween(220),
+                            label = "undoAlpha",
+                        )
+                        val redoAlpha by animateFloatAsState(
+                            targetValue = if (canRedo) 1f else 0f,
+                            animationSpec = tween(220),
+                            label = "redoAlpha",
+                        )
+                        IconButton(
+                            onClick = {
                                 haptics.tick()
                                 viewModel.undo()
-                            }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.Undo,
-                                    contentDescription = "Rückgängig",
-                                    tint = ink,
-                                )
-                            }
+                            },
+                            enabled = canUndo,
+                            modifier = Modifier.graphicsLayer { alpha = undoAlpha },
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Undo,
+                                contentDescription = "Rückgängig",
+                                tint = ink,
+                            )
                         }
-                        if (canRedo) {
-                            IconButton(onClick = {
+                        IconButton(
+                            onClick = {
                                 haptics.tick()
                                 viewModel.redo()
-                            }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.Redo,
-                                    contentDescription = "Wiederholen",
-                                    tint = ink,
-                                )
-                            }
+                            },
+                            enabled = canRedo,
+                            modifier = Modifier.graphicsLayer { alpha = redoAlpha },
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Redo,
+                                contentDescription = "Wiederholen",
+                                tint = ink,
+                            )
                         }
                         // Textmarker: Farbleiste ein-/ausblenden (nur für Text-Notizen).
                         if (note.type == NoteType.TEXT && !showingBack) {

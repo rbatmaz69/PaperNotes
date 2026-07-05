@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -157,6 +158,16 @@ class NotesViewModel @Inject constructor(
                 _selectedIds.update { it intersect visible }
             }
         }
+        // Einmaliger Langdruck-Hinweis: erst ab dem 3. Start, nur solange er nie gezeigt
+        // wurde und es überhaupt mehrere Zettel zum Auswählen gibt.
+        viewModelScope.launch {
+            val opens = settingsPreferences.incrementAppOpens()
+            if (opens >= 3 && !settingsPreferences.longPressHintSeen.first()) {
+                if (repository.observeActiveNotes().first().size >= 2) {
+                    _longPressHint.value = true
+                }
+            }
+        }
     }
 
     // --- Mehrfachauswahl ---
@@ -164,8 +175,26 @@ class NotesViewModel @Inject constructor(
     private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     val selectedIds: StateFlow<Set<Long>> = _selectedIds
 
+    private val _longPressHint = MutableStateFlow(false)
+    /** true, wenn der einmalige „Halte einen Zettel gedrückt"-Tipp gezeigt werden soll. */
+    val longPressHint: StateFlow<Boolean> = _longPressHint
+
+    private var longPressUsed = false
+
+    /** Blendet den Tipp aus und merkt sich dauerhaft, dass er erledigt ist. */
+    fun dismissLongPressHint() {
+        _longPressHint.value = false
+        viewModelScope.launch { settingsPreferences.markLongPressHintSeen() }
+    }
+
     /** Toggelt die Auswahl; Stapel werden als Einheit gewählt/abgewählt. */
     fun toggleSelected(item: GridItem) {
+        // Auswahl selbst entdeckt → Tipp ist überflüssig, stumm als gesehen markieren.
+        if (!longPressUsed) {
+            longPressUsed = true
+            if (_longPressHint.value) _longPressHint.value = false
+            viewModelScope.launch { settingsPreferences.markLongPressHintSeen() }
+        }
         val ids = when (item) {
             is SoloItem -> setOf(item.gridNote.note.id)
             is StackItem -> item.members.mapTo(mutableSetOf()) { it.note.id }

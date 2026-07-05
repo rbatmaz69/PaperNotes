@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import com.papernotes.ui.theme.PaperDimens
 
 /**
  * Papierstreifen-Snackbar: ein schmaler Zettel, der leicht schief unten im Bild liegt –
@@ -30,7 +31,7 @@ fun PaperSnackbar(
     val shape = RoundedCornerShape(10.dp)
     Row(
         modifier = modifier
-            .graphicsLayer { rotationZ = -1.5f }
+            .graphicsLayer { rotationZ = PaperDimens.TILT_PLAYFUL }
             .shadow(6.dp, shape)
             .background(MaterialTheme.colorScheme.surface, shape)
             .padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),

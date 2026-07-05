@@ -95,6 +95,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
+import com.papernotes.R
 import com.papernotes.domain.model.Note
 import com.papernotes.domain.model.NoteType
 import com.papernotes.domain.model.cardSurface
@@ -134,6 +136,7 @@ import com.papernotes.ui.components.TeabagPull
 import com.papernotes.ui.components.WaxRed
 import com.papernotes.ui.components.WaxSealBreakOverlay
 import com.papernotes.ui.components.WaxSealBreakRequest
+import com.papernotes.ui.theme.PaperDimens
 import com.papernotes.ui.theme.ThemeViewModel
 import com.papernotes.util.PhotoStore
 import com.papernotes.util.ShareCardRenderer
@@ -156,6 +159,7 @@ fun NotesScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val undoEvent by viewModel.undoEvent.collectAsStateWithLifecycle()
+    val longPressHint by viewModel.longPressHint.collectAsStateWithLifecycle()
     val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
     val currentTheme by themeViewModel.theme.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -370,7 +374,7 @@ fun NotesScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = contentPadding.calculateTopPadding() + 46.dp),
+                    .padding(top = contentPadding.calculateTopPadding() + PaperDimens.topBarHeight),
             ) {
                 AnimatedVisibility(
                     visible = searchVisible,
@@ -822,8 +826,35 @@ fun NotesScreen(
             }
             undoEvent?.let { event ->
                 LaunchedEffect(event.id) {
-                    kotlinx.coroutines.delay(5000)
+                    // Bei mehreren Zetteln länger sichtbar – mehr Zeit zum Glattstreichen.
+                    kotlinx.coroutines.delay(if (event.noteIds.size > 1) 8000 else 5000)
                     viewModel.dismissUndo(event.id)
+                }
+            }
+
+            // Einmaliger Papier-Tipp: Langdruck öffnet die Mehrfachauswahl. Weicht dem
+            // Undo-Streifen und verschwindet nach kurzer Zeit von selbst.
+            AnimatedVisibility(
+                visible = longPressHint && undoEvent == null && !selectionMode,
+                enter = slideInVertically { it * 2 } + fadeIn(),
+                exit = slideOutVertically { it * 2 } + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = contentPadding.calculateBottomPadding() + 56.dp),
+            ) {
+                PaperSnackbar(
+                    message = stringResource(R.string.hint_long_press),
+                    actionLabel = stringResource(R.string.hint_long_press_ok),
+                    onAction = {
+                        haptics.tap()
+                        viewModel.dismissLongPressHint()
+                    },
+                )
+            }
+            if (longPressHint) {
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(8000)
+                    viewModel.dismissLongPressHint()
                 }
             }
         }

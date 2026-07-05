@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -163,10 +165,13 @@ private fun ThemeSwatch(
     onClick: () -> Unit,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
+    val description = if (selected) "${theme.label}, ausgewählt" else theme.label
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.paperPress(RoundedCornerShape(16.dp), onClick = onClick),
+        modifier = Modifier
+            .paperPress(RoundedCornerShape(16.dp), onClick = onClick)
+            .semantics { contentDescription = description },
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (theme == PaperTheme.AUTO) {

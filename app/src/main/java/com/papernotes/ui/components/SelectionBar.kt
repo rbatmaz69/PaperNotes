@@ -34,9 +34,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.papernotes.domain.model.MoodCategory
 import com.papernotes.domain.model.earAccent
+import com.papernotes.ui.theme.PaperDimens
 import com.papernotes.util.rememberPaperHaptics
 
 /**
@@ -55,13 +58,13 @@ fun SelectionBar(
     onTag: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(PaperDimens.actionCorner)
     Row(
         modifier = modifier
-            .graphicsLayer { rotationZ = -0.6f }
+            .graphicsLayer { rotationZ = PaperDimens.TILT_SUBTLE }
             .shadow(5.dp, shape)
             .background(MaterialTheme.colorScheme.surface, shape)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = 2.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SelectionAction(Icons.Rounded.Close, "Auswahl beenden", onClose)
@@ -88,7 +91,7 @@ private fun SelectionAction(
 ) {
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(PaperDimens.touchTarget)
             .paperPress(CircleShape, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -163,7 +166,8 @@ fun MoodOnlySheet(
                                 haptics.tick()
                                 onPick(mood)
                             }
-                            .background(mood.earAccent(), CircleShape),
+                            .background(mood.earAccent(), CircleShape)
+                            .semantics { contentDescription = mood.label },
                     )
                 }
             }
