@@ -42,6 +42,17 @@ class SettingsPreferences @Inject constructor(
         context.settingsDataStore.edit { it[sortModeKeyPref] = key }
     }
 
+    private val gridColumnsPref = intPreferencesKey("grid_columns")
+
+    /** Spaltenzahl des Notiz-Grids (1–3, per Pinch gewählt; Default 2). */
+    val gridColumns: Flow<Int> = context.settingsDataStore.data.map { prefs ->
+        (prefs[gridColumnsPref] ?: 2).coerceIn(1, 3)
+    }
+
+    suspend fun setGridColumns(columns: Int) {
+        context.settingsDataStore.edit { it[gridColumnsPref] = columns.coerceIn(1, 3) }
+    }
+
     private val appOpensPref = intPreferencesKey("app_opens")
     private val longPressHintSeenPref = booleanPreferencesKey("longpress_hint_seen")
 

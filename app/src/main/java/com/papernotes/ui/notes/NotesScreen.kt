@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.background
@@ -188,14 +189,32 @@ fun NotesScreen(
         }
     }
 
-    var columns by remember { mutableIntStateOf(2) }
+    val haptics = rememberPaperHaptics()
+    val columns by viewModel.gridColumns.collectAsStateWithLifecycle()
     var zoomAccum by remember { mutableFloatStateOf(1f) }
+    var columnsChangedAt by remember { mutableStateOf(0L) }
     val transformState = rememberTransformableState { zoomChange, _, _ ->
         zoomAccum *= zoomChange
-        when {
-            zoomAccum > 1.25f -> { columns = (columns - 1).coerceAtLeast(1); zoomAccum = 1f }
-            zoomAccum < 0.8f -> { columns = (columns + 1).coerceAtMost(3); zoomAccum = 1f }
+        val next = when {
+            zoomAccum > 1.25f -> (columns - 1).coerceAtLeast(1)
+            zoomAccum < 0.8f -> (columns + 1).coerceAtMost(3)
+            else -> columns
         }
+        if (next != columns) {
+            zoomAccum = 1f
+            haptics.fold()
+            columnsChangedAt = System.currentTimeMillis()
+            viewModel.setGridColumns(next)
+        } else if (zoomAccum > 1.25f || zoomAccum < 0.8f) {
+            // Am Anschlag (1 bzw. 3 Spalten): Akku kappen, damit die Gegenrichtung
+            // nicht erst den ganzen angesammelten Zoom abtragen muss.
+            zoomAccum = zoomAccum.coerceIn(0.8f, 1.25f)
+        }
+    }
+    // Restzoom einer beendeten Geste verwerfen – sonst schaltet der nächste Pinch
+    // sofort oder in die falsche Richtung.
+    LaunchedEffect(transformState.isTransformInProgress) {
+        if (!transformState.isTransformInProgress) zoomAccum = 1f
     }
 
     // Tinten-Suche: ausschließlich über das Lupen-Icon (kein Pull-down mehr).
@@ -292,7 +311,6 @@ fun NotesScreen(
     BackHandler(enabled = selectionMode) { viewModel.clearSelection() }
 
     // Pinnwand: Anordnen-Modus zum freien Umsortieren der Karten.
-    val haptics = rememberPaperHaptics()
     var arrangeMode by remember { mutableStateOf(false) }
     // Position jedes Grid-Items (Solo & Stapel) in Root-Koordinaten – für die Ziel-Erkennung.
     val itemBounds = remember { mutableStateMapOf<String, Rect>() }
@@ -811,6 +829,38 @@ fun NotesScreen(
                         .padding(24.dp)
                         .padding(bottom = contentPadding.calculateBottomPadding()),
                 )
+            }
+
+            // Spalten-Streifen: zeigt nach dem Pinch kurz die neue Spaltenzahl.
+            var showColumnsStrip by remember { mutableStateOf(false) }
+            LaunchedEffect(columnsChangedAt) {
+                if (columnsChangedAt > 0L) {
+                    showColumnsStrip = true
+                    kotlinx.coroutines.delay(1200)
+                    showColumnsStrip = false
+                }
+            }
+            AnimatedVisibility(
+                visible = showColumnsStrip,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = contentPadding.calculateTopPadding() + PaperDimens.topBarHeight + 8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer { rotationZ = PaperDimens.TILT_PLAYFUL }
+                        .shadow(6.dp, RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        text = if (columns == 1) "1 Spalte" else "$columns Spalten",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
 
             // Undo-Streifen: lugt nach Zerknüllen/Archivieren kurz aus dem Papierkorb hervor.

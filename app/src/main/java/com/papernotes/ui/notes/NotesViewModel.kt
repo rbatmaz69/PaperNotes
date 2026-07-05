@@ -247,6 +247,14 @@ class NotesViewModel @Inject constructor(
         settingsPreferences.setSortModeKey(mode.name)
     }
 
+    /** Persistierte Spaltenzahl des Grids (Pinch-Zoom, 1–3). */
+    val gridColumns: StateFlow<Int> = settingsPreferences.gridColumns
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 2)
+
+    fun setGridColumns(columns: Int) = viewModelScope.launch {
+        settingsPreferences.setGridColumns(columns)
+    }
+
     // Mood + Tag vorab bündeln: combine() ist unten sonst am 5-Flow-Limit.
     private val filterState = combine(moodFilter, tagFilter) { mood, tag -> mood to tag }
 
