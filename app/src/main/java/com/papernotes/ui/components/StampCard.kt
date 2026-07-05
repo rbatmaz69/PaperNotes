@@ -9,16 +9,20 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,13 +42,19 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.papernotes.domain.StampCodec
 import com.papernotes.domain.StampMotif
 import com.papernotes.util.rememberPaperHaptics
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -57,6 +67,19 @@ private val MONTH_NAMES = listOf(
 
 private val CELL = 34.dp
 private val COMPACT_CELL = 22.dp
+
+private val SLOT_DATE = DateTimeFormatter.ofPattern("d. MMMM", Locale.GERMAN)
+
+/** Deutsche Bezeichnung des Motivs – für Screenreader auf den Canvas-Abdrücken. */
+private val StampMotif.germanLabel: String
+    get() = when (this) {
+        StampMotif.CHECK -> "Haken"
+        StampMotif.STAR -> "Stern"
+        StampMotif.HEART -> "Herz"
+        StampMotif.DROP -> "Tropfen"
+        StampMotif.LEAF -> "Blatt"
+        StampMotif.SUN -> "Sonne"
+    }
 
 /**
  * Eine Papier-Stempelkarte (Gewohnheit). Jeder erledigte Tag trägt einen leicht schiefen
@@ -121,7 +144,7 @@ fun StampCard(
     }
 
     @Composable
-    fun slot(day: Long, cell: Dp, dayLabel: Int?) {
+    fun slot(day: Long, cell: Dp, dayLabel: Int?, tappable: Boolean = true) {
         val isFuture = day > today
         StampSlot(
             stamped = day in stamps,
@@ -135,9 +158,12 @@ fun StampCard(
             pulse = pulse,
             motif = motif,
             dayLabel = dayLabel,
-            onStamp = if (!isFuture) ({ toggle(day) }) else null,
+            onStamp = if (tappable && !isFuture) ({ toggle(day) }) else null,
         )
     }
+
+    // Strähne lebt noch (Anker gestern), aber heute ist nicht gestempelt → sanft mahnen.
+    val todayOpen = streak > 0 && !todayStamped
 
     if (compact) {
         Column(
@@ -147,10 +173,23 @@ fun StampCard(
             Text(
                 text = if (streak > 0) "Strähne $streak" else "Noch keine Strähne",
                 style = MaterialTheme.typography.titleSmall,
-                color = ink,
+                color = if (todayOpen) inkOf(accent) else ink,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                (today - 6..today).forEach { slot(it, COMPACT_CELL, null) }
+                // Nur der heutige Slot stempelt – vergangene Tage sind hier reine Anzeige,
+                // damit ein Fehltipp auf der Pinnwand keine Historie zerstört (Nachstempeln
+                // bewusst im Editor). Wochentags-Initialen geben den 7 Punkten ihren Bezug.
+                (today - 6..today).forEach { day ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val dow = LocalDate.ofEpochDay(day).dayOfWeek.value
+                        Text(
+                            text = WEEKDAY_INITIALS[dow - 1],
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = if (day == today) accent else outline.copy(alpha = 0.7f),
+                        )
+                        slot(day, COMPACT_CELL, null, tappable = day == today)
+                    }
+                }
             }
         }
         return
@@ -161,11 +200,12 @@ fun StampCard(
     var month by remember { mutableStateOf(currentMonth) }
     val canNext = month < currentMonth
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        // Kopf: Monatsnavigation
+    BoxWithConstraints(modifier = modifier) {
+        // Zellen füllen die Blattbreite (größere Trefferfläche), bleiben aber gedeckelt.
+        val cell = ((maxWidth - 4.dp * 6) / 7).coerceIn(CELL, 48.dp)
+
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Kopf: Monatsnavigation + Rücksprung zu heute
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -179,16 +219,32 @@ fun StampCard(
             NavArrow(glyph = "›", accent = accent, enabled = canNext) {
                 if (canNext) month = month.plusMonths(1)
             }
+            if (month != currentMonth) {
+                Box(
+                    modifier = Modifier
+                        .paperPress(RoundedCornerShape(50)) { month = currentMonth }
+                        .background(accent.copy(alpha = 0.16f), RoundedCornerShape(50))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        text = "Heute",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = inkOf(accent),
+                    )
+                }
+            }
         }
 
-        // Stat-Zeile: Strähne · Rekord · gesamt
+        // Stat-Zeile: Strähne · heute offen · bis Konfetti · Rekord · gesamt
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 text = if (streak > 0) "Strähne $streak" else "Noch keine Strähne",
                 style = MaterialTheme.typography.titleSmall,
-                color = ink,
+                color = if (todayOpen) inkOf(accent) else ink,
             )
             val extra = buildList {
+                if (todayOpen) add("heute noch offen")
+                if (streak > 0 && streak % 7L != 0L) add("noch ${7 - streak % 7} bis Konfetti")
                 if (record > 0) add("Rekord $record")
                 if (total > 0) add("$total gesamt")
             }
@@ -204,7 +260,7 @@ fun StampCard(
         // Wochentags-Kopfzeile (Montag-first)
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             WEEKDAY_INITIALS.forEach { letter ->
-                Box(modifier = Modifier.size(CELL), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.size(cell), contentAlignment = Alignment.Center) {
                     Text(
                         text = letter,
                         style = MaterialTheme.typography.labelSmall,
@@ -222,14 +278,15 @@ fun StampCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     week.forEach { d ->
                         if (d == null) {
-                            Spacer(Modifier.size(CELL))
+                            Spacer(Modifier.size(cell))
                         } else {
-                            slot(month.atDay(d).toEpochDay(), CELL, d)
+                            slot(month.atDay(d).toEpochDay(), cell, d)
                         }
                     }
-                    repeat(7 - week.size) { Spacer(Modifier.size(CELL)) }
+                    repeat(7 - week.size) { Spacer(Modifier.size(cell)) }
                 }
             }
+        }
         }
     }
 }
@@ -255,6 +312,10 @@ fun StampMotifPicker(
                 modifier = Modifier
                     .size(46.dp)
                     .paperPress(CircleShape) { onPick(m) }
+                    .semantics {
+                        contentDescription = m.germanLabel
+                        this.selected = isSelected
+                    }
                     .then(
                         if (isSelected) Modifier.border(2.dp, accent, CircleShape) else Modifier,
                     ),
@@ -311,11 +372,24 @@ private fun StampSlot(
     // Pro Tag leicht andere Stempel-Drehung – wirkt handgestempelt.
     val tilt = ((rotationSeed * 37L) % 11L - 5L).toFloat()
     val ink = inkOf(accent)
+    // rotationSeed ist der Epoch-Tag → daraus die Ansage für Screenreader bauen.
+    val slotDescription = buildString {
+        append(if (isToday) "Heute" else LocalDate.ofEpochDay(rotationSeed).format(SLOT_DATE))
+        append(", ")
+        append(
+            when {
+                stamped -> "gestempelt"
+                isFuture -> "liegt in der Zukunft"
+                else -> "nicht gestempelt"
+            },
+        )
+    }
 
     Box(
         modifier = Modifier
             .size(slotSize)
-            .then(if (onStamp != null) Modifier.paperPress(CircleShape, onClick = onStamp) else Modifier),
+            .then(if (onStamp != null) Modifier.paperPress(CircleShape, onClick = onStamp) else Modifier)
+            .semantics { contentDescription = slotDescription },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.size(slotSize)) {
@@ -353,17 +427,27 @@ private fun StampSlot(
             }
         }
 
-        // Tageszahl im Kalender (nur, wenn kein Abdruck den Slot füllt).
-        if (dayLabel != null && !stamped) {
-            Text(
-                text = dayLabel.toString(),
-                style = MaterialTheme.typography.labelSmall,
-                color = when {
-                    isToday -> accent
-                    isFuture -> outline.copy(alpha = 0.4f)
-                    else -> outline
-                },
-            )
+        // Tageszahl im Kalender: auf leeren Tagen mittig, auf gestempelten klein in der
+        // Ecke – so bleibt beim Nachstempeln/Prüfen die Orientierung erhalten.
+        if (dayLabel != null) {
+            if (!stamped) {
+                Text(
+                    text = dayLabel.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = when {
+                        isToday -> accent
+                        isFuture -> outline.copy(alpha = 0.4f)
+                        else -> outline
+                    },
+                )
+            } else {
+                Text(
+                    text = dayLabel.toString(),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                    color = ink.copy(alpha = 0.85f),
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                )
+            }
         }
     }
 }

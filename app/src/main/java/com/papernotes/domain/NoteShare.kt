@@ -28,7 +28,12 @@ fun Note.toShareBody(): String = when (type) {
         }
     NoteType.STAMPCARD -> {
         val today = LocalDate.now().toEpochDay()
-        "Strähne: ${StampCodec.streak(stamps, today)} Tage · ${StampCodec.total(stamps)}× gestempelt"
+        val record = StampCodec.longestStreak(stamps)
+        buildList {
+            add("Strähne: ${StampCodec.streak(stamps, today)} Tage")
+            if (record > 0) add("Rekord: $record")
+            add("${StampCodec.total(stamps)}× gestempelt")
+        }.joinToString(" · ")
     }
     NoteType.SKETCH -> "🖊️ Skizze"
     NoteType.TEXT -> body.trim()

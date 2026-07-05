@@ -98,10 +98,12 @@ class EditorViewModel @Inject constructor(
     private var saveJob: Job? = null
     private var nextUiId = 1L
 
-    // --- Undo/Redo (Text, Rückseite, Textmarker, Checkliste) ---
+    // --- Undo/Redo (Text, Rückseite, Textmarker, Checkliste, Stempel) ---
     // Snapshot-basiert: vor jeder Mutation wird der alte Zustand gesichert; schnelle
     // Tastenanschläge im selben Feld werden zu einem Schritt gruppiert. Skizzen behalten
-    // ihr eigenes undoStroke(), Stempel sind per erneutem Tipp trivial reversibel.
+    // ihr eigenes undoStroke(). Stempel liegen im body (StampCodec) und laufen daher
+    // automatisch über die Snapshots mit – wichtig, weil ein Fehltipp sonst still einen
+    // Tag aus der Strähnen-Historie löschen würde.
 
     private data class EditorSnapshot(
         val title: String,
@@ -111,7 +113,7 @@ class EditorViewModel @Inject constructor(
         val items: List<EditableChecklistItem>,
     )
 
-    private enum class EditField { TITLE, BODY, BACK, HIGHLIGHT, CHECKLIST }
+    private enum class EditField { TITLE, BODY, BACK, HIGHLIGHT, CHECKLIST, STAMPS }
 
     private val undoStack = ArrayDeque<EditorSnapshot>()
     private val redoStack = ArrayDeque<EditorSnapshot>()
@@ -459,6 +461,7 @@ class EditorViewModel @Inject constructor(
      * Nachstempeln. Konfetti, wenn ein neuer Stempel die aktuelle Strähne auf eine 7er-Marke hebt.
      */
     fun toggleStamp(day: Long) {
+        recordSnapshot(EditField.STAMPS, group = false)
         val days = _note.value.stamps.toMutableSet()
         val nowStamped = if (day in days) {
             days.remove(day); false
@@ -475,6 +478,7 @@ class EditorViewModel @Inject constructor(
 
     /** Wählt das Stempel-Motiv der Karte (bewahrt die bereits gestempelten Tage). */
     fun setStampMotif(motif: StampMotif) {
+        recordSnapshot(EditField.STAMPS, group = false)
         _note.update { it.withStampMotif(motif) }
         scheduleSave()
     }
