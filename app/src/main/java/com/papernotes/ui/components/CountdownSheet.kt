@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.papernotes.util.rememberPaperHaptics
 import com.papernotes.ui.theme.Terracotta
+import com.papernotes.ui.theme.sheetItemEnter
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -80,9 +81,9 @@ fun CountdownSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            PresetRow("In 1 Woche") { onPick(inDays(7)) }
-            PresetRow("In 1 Monat") { onPick(inMonths(1)) }
-            PresetRow("Eigenes Datum …", icon = Icons.Rounded.Event) { showCustom = true }
+            PresetRow("In 1 Woche", modifier = Modifier.sheetItemEnter(0)) { onPick(inDays(7)) }
+            PresetRow("In 1 Monat", modifier = Modifier.sheetItemEnter(1)) { onPick(inMonths(1)) }
+            PresetRow("Eigenes Datum …", icon = Icons.Rounded.Event, modifier = Modifier.sheetItemEnter(2)) { showCustom = true }
 
             if (currentCountdownAt != null) {
                 Row(
@@ -131,11 +132,12 @@ fun CountdownSheet(
 private fun PresetRow(
     label: String,
     icon: ImageVector = Icons.Rounded.CalendarMonth,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(RoundedCornerShape(14.dp)) { onClick() }
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))

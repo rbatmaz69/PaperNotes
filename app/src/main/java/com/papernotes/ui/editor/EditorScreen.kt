@@ -7,12 +7,21 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -109,6 +118,7 @@ import com.papernotes.ui.components.TagPickerSheet
 import com.papernotes.ui.components.paperPress
 import com.papernotes.ui.components.paperRuling
 import com.papernotes.ui.theme.PaperDimens
+import com.papernotes.ui.theme.PaperMotion
 import java.time.LocalDate
 import com.papernotes.util.PhotoStore
 import com.papernotes.util.ShareCardRenderer
@@ -279,8 +289,24 @@ fun EditorScreen(
                             tint = ink,
                         )
                     }
+                    // Werkzeug-Wechsel (Icons ↔ Textmarker-Farben) blendet mit kleinem Pop über;
+                    // die Breite gleitet mit, statt zu springen.
+                    val showMarkerColors = markerBar && note.type == NoteType.TEXT && !showingBack
+                    AnimatedContent(
+                        targetState = showMarkerColors,
+                        label = "editorTopTools",
+                        transitionSpec = {
+                            (
+                                fadeIn(tween(PaperMotion.DurShort)) +
+                                    scaleIn(tween(PaperMotion.DurShort), initialScale = 0.92f)
+                            ) togetherWith fadeOut(tween(PaperMotion.DurShortExit)) using
+                                SizeTransform(clip = false) { _, _ ->
+                                    tween(PaperMotion.DurMedium, easing = PaperMotion.EaseStandard)
+                                }
+                        },
+                    ) { markerColorsVisible ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                      if (markerBar && note.type == NoteType.TEXT && !showingBack) {
+                      if (markerColorsVisible) {
                         // Textmarker aktiv: Farb-Swatches direkt in der oberen Leiste.
                         HighlightColors.forEachIndexed { index, color ->
                             Box(
@@ -361,7 +387,12 @@ fun EditorScreen(
                                 )
                             }
                         }
-                        // Blatt umdrehen: Vorder- ↔ Rückseite
+                        // Blatt umdrehen: Vorder- ↔ Rückseite (Tönung blendet weich über).
+                        val flipTint by animateColorAsState(
+                            targetValue = if (showingBack) note.mood.earAccent() else ink,
+                            animationSpec = tween(PaperMotion.DurMedium),
+                            label = "flipTint",
+                        )
                         IconButton(onClick = {
                             haptics.fold()
                             showingBack = !showingBack
@@ -369,7 +400,7 @@ fun EditorScreen(
                             Icon(
                                 imageVector = Icons.Rounded.FlipToBack,
                                 contentDescription = if (showingBack) "Vorderseite" else "Rückseite",
-                                tint = if (showingBack) note.mood.earAccent() else ink,
+                                tint = flipTint,
                             )
                         }
                         DogEar(
@@ -394,10 +425,18 @@ fun EditorScreen(
                         }
                       }
                     }
+                    }
                 }
 
-                // Sprung-Chips zu per rotem Faden verknüpften Notizen
-                if (linkedNotes.isNotEmpty()) {
+                // Sprung-Chips zu per rotem Faden verknüpften Notizen — gleiten sanft auf/zu.
+                AnimatedVisibility(
+                    visible = linkedNotes.isNotEmpty(),
+                    enter = expandVertically(
+                        tween(PaperMotion.DurLong, easing = PaperMotion.EaseEmphasizedDecel),
+                    ) + fadeIn(tween(PaperMotion.DurLong, easing = PaperMotion.EaseEmphasizedDecel)),
+                    exit = shrinkVertically(tween(PaperMotion.DurShortExit)) +
+                        fadeOut(tween(PaperMotion.DurShortExit)),
+                ) {
                     LinkedNoteChips(
                         notes = linkedNotes,
                         onOpen = { id ->

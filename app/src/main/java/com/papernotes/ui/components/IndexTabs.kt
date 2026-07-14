@@ -1,5 +1,8 @@
 package com.papernotes.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -16,10 +19,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -28,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.papernotes.domain.model.MoodCategory
 import com.papernotes.domain.model.earAccent
+import com.papernotes.ui.theme.PaperMotion
 
 /**
  * Stabile Reiter-Farbe aus dem Tag-Namen: gleicher Name → immer dieselbe Farbe.
@@ -111,6 +117,29 @@ fun TagFilterRow(
         presentTags.forEach { tag ->
             val isActive = tag == active
             val bg = tabColor(tag)
+            // Zustandswechsel weich: Füllung, Rahmen und Textfarbe blenden über,
+            // die aktive Pill ploppt leicht auf statt hart umzuschalten.
+            val fillAlpha by animateFloatAsState(
+                targetValue = if (isActive) 1f else 0.35f,
+                animationSpec = tween(PaperMotion.DurMedium),
+                label = "tagFill",
+            )
+            val borderProgress by animateFloatAsState(
+                targetValue = if (isActive) 1f else 0f,
+                animationSpec = tween(PaperMotion.DurMedium),
+                label = "tagBorder",
+            )
+            val pillScale by animateFloatAsState(
+                targetValue = if (isActive) 1f else 0.94f,
+                animationSpec = PaperMotion.SpringPop,
+                label = "tagScale",
+            )
+            val textColor by animateColorAsState(
+                targetValue = if (isActive) labelOn(bg) else MaterialTheme.colorScheme.onBackground,
+                animationSpec = tween(PaperMotion.DurMedium),
+                label = "tagText",
+            )
+            val borderColor = MaterialTheme.colorScheme.onBackground
             // Äußere Hitbox ≥36dp – die sichtbare Pill bleibt klein.
             Box(
                 modifier = Modifier
@@ -124,18 +153,22 @@ fun TagFilterRow(
             ) {
                 Box(
                     modifier = Modifier
-                        .background(bg.copy(alpha = if (isActive) 1f else 0.35f), shape)
-                        .then(
-                            if (isActive) {
-                                Modifier.border(1.5.dp, MaterialTheme.colorScheme.onBackground, shape)
-                            } else Modifier,
+                        .graphicsLayer {
+                            scaleX = pillScale
+                            scaleY = pillScale
+                        }
+                        .background(bg.copy(alpha = fillAlpha), shape)
+                        .border(
+                            width = 1.5.dp * borderProgress,
+                            color = borderColor.copy(alpha = borderProgress),
+                            shape = shape,
                         )
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
                     Text(
                         text = tag,
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isActive) labelOn(bg) else MaterialTheme.colorScheme.onBackground,
+                        color = textColor,
                         maxLines = 1,
                     )
                 }

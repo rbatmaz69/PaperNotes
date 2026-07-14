@@ -1,12 +1,13 @@
 package com.papernotes.ui.navigation
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import com.papernotes.domain.model.NoteType
 import com.papernotes.ui.agenda.AgendaScreen
 import com.papernotes.ui.editor.EditorScreen
 import com.papernotes.ui.notes.NotesScreen
+import com.papernotes.ui.theme.PaperMotion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -65,12 +67,32 @@ fun PaperNotesNavGraph(
             targetState = selectedNoteId,
             label = "paperNav",
             transitionSpec = {
-                fadeIn(tween(durationMillis = 160)) togetherWith
-                    fadeOut(tween(durationMillis = 120))
+                fadeIn(
+                    tween(PaperMotion.DurLong, easing = PaperMotion.EaseEmphasizedDecel),
+                ) togetherWith fadeOut(tween(PaperMotion.DurShortExit))
             },
         ) { target ->
+            // Äußerer Scope für sharedBounds — nicht vom inneren AnimatedContent shadowen lassen.
+            val navScope = this@AnimatedContent
             if (target == null) {
-                Crossfade(targetState = agendaVisible, label = "agendaSwap") { showAgenda ->
+                // Agenda schiebt sich wie ein Schreibtisch-Block von unten nach vorn,
+                // das Grid gleitet dezent in die Gegenrichtung zurück.
+                AnimatedContent(
+                    targetState = agendaVisible,
+                    label = "agendaSwap",
+                    transitionSpec = {
+                        val dir = if (targetState) 1 else -1
+                        (
+                            slideInVertically(
+                                tween(PaperMotion.DurLong, easing = PaperMotion.EaseEmphasizedDecel),
+                            ) { it / 8 * dir } +
+                                fadeIn(tween(PaperMotion.DurLong, easing = PaperMotion.EaseEmphasizedDecel))
+                        ) togetherWith (
+                            slideOutVertically(tween(PaperMotion.DurShortExit)) { -it / 12 * dir } +
+                                fadeOut(tween(PaperMotion.DurShortExit))
+                        )
+                    },
+                ) { showAgenda ->
                     if (showAgenda) {
                         AgendaScreen(
                             onOpenNote = { id ->
@@ -83,7 +105,7 @@ fun PaperNotesNavGraph(
                     } else {
                         NotesScreen(
                             sharedScope = this@SharedTransitionLayout,
-                            animatedScope = this@AnimatedContent,
+                            animatedScope = navScope,
                             onOpenNote = {
                                 editorSession++
                                 selectedNoteId = it

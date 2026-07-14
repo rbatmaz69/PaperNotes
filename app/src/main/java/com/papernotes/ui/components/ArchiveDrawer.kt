@@ -1,9 +1,18 @@
 package com.papernotes.ui.components
 
 import com.papernotes.ui.theme.PaperDimens
+import com.papernotes.ui.theme.PaperMotion
+import com.papernotes.ui.theme.sheetItemEnter
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.papernotes.domain.model.Note
@@ -110,50 +119,66 @@ fun ArchiveDrawerSheet(
                 DrawerTab("Papierkorb (${trashed.size})", tab == 1) { tab = 1 }
             }
 
-            if (tab == 0) {
-                if (archived.isEmpty()) {
-                    EmptyDrawerHint("Nichts archiviert.")
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.heightIn(max = 420.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        items(archived, key = { it.id }) { note ->
-                            ArchivedRow(
-                                note = note,
-                                onRestore = {
-                                    haptics.confirm()
-                                    onRestoreArchived(note.id)
-                                },
-                            )
-                        }
-                    }
-                }
-            } else {
-                if (trashed.isEmpty()) {
-                    EmptyDrawerHint("Der Papierkorb ist leer.")
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "Tippen glättet das Papier und legt die Notiz zurück. " +
-                                "Nach 30 Tagen wird endgültig gelöscht.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(72.dp),
-                            modifier = Modifier.heightIn(max = 360.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            // Fach-Wechsel gleitet seitlich, passend zur Tab-Richtung.
+            AnimatedContent(
+                targetState = tab,
+                label = "drawerTab",
+                transitionSpec = {
+                    val dir = if (targetState > initialState) 1 else -1
+                    (
+                        slideInHorizontally(
+                            tween(PaperMotion.DurLong, easing = PaperMotion.EaseEmphasizedDecel),
+                        ) { it / 6 * dir } +
+                            fadeIn(tween(PaperMotion.DurLong, easing = PaperMotion.EaseEmphasizedDecel))
+                    ) togetherWith fadeOut(tween(PaperMotion.DurShortExit))
+                },
+            ) { currentTab ->
+                if (currentTab == 0) {
+                    if (archived.isEmpty()) {
+                        EmptyDrawerHint("Nichts archiviert.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 420.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            items(trashed, key = { it.id }) { note ->
-                                CrumpledBall(
+                            itemsIndexed(archived, key = { _, note -> note.id }) { index, note ->
+                                ArchivedRow(
                                     note = note,
                                     onRestore = {
                                         haptics.confirm()
-                                        onRestoreTrashed(note.id)
+                                        onRestoreArchived(note.id)
                                     },
+                                    modifier = Modifier.sheetItemEnter(index),
                                 )
+                            }
+                        }
+                    }
+                } else {
+                    if (trashed.isEmpty()) {
+                        EmptyDrawerHint("Der Papierkorb ist leer.")
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Tippen glättet das Papier und legt die Notiz zurück. " +
+                                    "Nach 30 Tagen wird endgültig gelöscht.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline,
+                            )
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(72.dp),
+                                modifier = Modifier.heightIn(max = 360.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                items(trashed, key = { it.id }) { note ->
+                                    CrumpledBall(
+                                        note = note,
+                                        onRestore = {
+                                            haptics.confirm()
+                                            onRestoreTrashed(note.id)
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -171,12 +196,18 @@ fun ArchiveDrawerSheet(
 
 @Composable
 private fun DrawerTab(label: String, active: Boolean, onClick: () -> Unit) {
+    // Aktiv-Zustand blendet weich über.
+    val tabAlpha by animateFloatAsState(
+        targetValue = if (active) 1f else 0.4f,
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "drawerTabAlpha",
+    )
     Text(
         text = label,
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier
-            .alpha(if (active) 1f else 0.4f)
+            .graphicsLayer { alpha = tabAlpha }
             .paperPress(RoundedCornerShape(8.dp), onClick = onClick),
     )
 }
@@ -192,9 +223,9 @@ private fun EmptyDrawerHint(text: String) {
 }
 
 @Composable
-private fun ArchivedRow(note: Note, onRestore: () -> Unit) {
+private fun ArchivedRow(note: Note, onRestore: () -> Unit, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(RoundedCornerShape(12.dp), onClick = onRestore)
             .background(note.mood.cardSurface(), RoundedCornerShape(12.dp))

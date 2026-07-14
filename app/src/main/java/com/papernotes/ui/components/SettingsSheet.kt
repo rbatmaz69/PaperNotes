@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.papernotes.ui.theme.PaperTheme
+import com.papernotes.ui.theme.sheetItemEnter
 import com.papernotes.util.rememberPaperHaptics
 
 /**
@@ -86,8 +87,11 @@ fun SettingsSheet(
             )
             // Kein Lazy-Grid: die Column scrollt bereits, feste Reihen genügen.
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                PaperTheme.selectable.chunked(4).forEach { rowThemes ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                PaperTheme.selectable.chunked(4).forEachIndexed { rowIndex, rowThemes ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.sheetItemEnter(rowIndex),
+                    ) {
                         rowThemes.forEach { theme ->
                             ThemeSwatch(
                                 theme = theme,
@@ -107,11 +111,11 @@ fun SettingsSheet(
                 style = MaterialTheme.typography.titleMedium,
                 color = ink,
             )
-            BackupRow(icon = Icons.Rounded.Save, label = "Sichern") {
+            BackupRow(icon = Icons.Rounded.Save, label = "Sichern", modifier = Modifier.sheetItemEnter(3)) {
                 haptics.tap()
                 onExport()
             }
-            BackupRow(icon = Icons.Rounded.FileOpen, label = "Importieren") {
+            BackupRow(icon = Icons.Rounded.FileOpen, label = "Importieren", modifier = Modifier.sheetItemEnter(4)) {
                 haptics.tap()
                 onImport()
             }
@@ -142,11 +146,12 @@ fun SettingsSheet(
 private fun BackupRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(RoundedCornerShape(14.dp), onClick = onClick)
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))

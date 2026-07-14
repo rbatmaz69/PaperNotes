@@ -3,6 +3,7 @@ package com.papernotes.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import com.papernotes.domain.model.MoodCategory
 import com.papernotes.domain.model.earAccent
+import com.papernotes.ui.theme.PaperMotion
 
 /**
  * "Tinten-Suche": dezentes Suchfeld, das per Pull-down auf dem Grid hervorkommt.
@@ -125,6 +127,13 @@ fun MoodFilterRow(
                 animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
                 label = "moodDot",
             )
+            // Ring blendet weich ein/aus statt hart zu schalten.
+            val ringProgress by animateFloatAsState(
+                targetValue = if (isActive) 1f else 0f,
+                animationSpec = tween(PaperMotion.DurMedium),
+                label = "moodRing",
+            )
+            val ringColor = MaterialTheme.colorScheme.onBackground
             // Trefferfläche 32dp um den kleinen Punkt; Semantik für Screenreader.
             Box(
                 modifier = Modifier
@@ -144,14 +153,10 @@ fun MoodFilterRow(
                         }
                         .size(14.dp)
                         .background(mood.earAccent(), CircleShape)
-                        .then(
-                            if (isActive) {
-                                Modifier.border(
-                                    1.5.dp,
-                                    MaterialTheme.colorScheme.onBackground,
-                                    CircleShape,
-                                )
-                            } else Modifier,
+                        .border(
+                            width = 1.5.dp * ringProgress,
+                            color = ringColor.copy(alpha = ringProgress),
+                            shape = CircleShape,
                         ),
                 )
             }

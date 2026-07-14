@@ -1,6 +1,11 @@
 package com.papernotes.ui.components
 
 import com.papernotes.ui.theme.PaperDimens
+import com.papernotes.ui.theme.PaperMotion
+import com.papernotes.ui.theme.sheetItemEnter
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +81,7 @@ fun TagPickerSheet(
                     text = "Noch keine Reiter. Tippe unten einen Namen ein, um den ersten anzulegen.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.sheetItemEnter(0),
                 )
             } else {
                 FlowRow(
@@ -83,11 +89,12 @@ fun TagPickerSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    allTags.forEach { tag ->
+                    allTags.forEachIndexed { index, tag ->
                         TagChip(
                             label = tag,
                             selected = tag in noteTags,
                             onClick = { onToggle(tag) },
+                            modifier = Modifier.sheetItemEnter(index),
                         )
                     }
                 }
@@ -119,21 +126,26 @@ private fun TagChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(10.dp)
     val bg = tabColor(label)
+    // Auswahl blendet weich über: Füllung rein, Rahmen raus (und umgekehrt).
+    val fill by animateColorAsState(
+        targetValue = if (selected) bg else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "tagChipFill",
+    )
+    val borderAlpha by animateFloatAsState(
+        targetValue = if (selected) 0f else 0.6f,
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "tagChipBorder",
+    )
     Box(
-        modifier = Modifier
+        modifier = modifier
             .paperPress(shape, onClick = onClick)
-            .background(
-                if (selected) bg else MaterialTheme.colorScheme.surfaceVariant,
-                shape,
-            )
-            .then(
-                if (!selected) {
-                    Modifier.border(1.5.dp, bg.copy(alpha = 0.6f), shape)
-                } else Modifier,
-            )
+            .background(fill, shape)
+            .border(1.5.dp, bg.copy(alpha = borderAlpha), shape)
             .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

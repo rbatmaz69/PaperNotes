@@ -1,6 +1,10 @@
 package com.papernotes.ui.components
 
 import com.papernotes.ui.theme.PaperDimens
+import com.papernotes.ui.theme.PaperMotion
+import com.papernotes.ui.theme.sheetItemEnter
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -109,6 +113,7 @@ fun ReminderSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .sheetItemEnter(0)
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -117,11 +122,11 @@ fun ReminderSheet(
                 }
             }
 
-            PresetRow("In 1 Stunde") { onPick(inOneHour(), rule) }
-            PresetRow("Heute Abend · 20:00") { onPick(todayAt(20, 0), rule) }
-            PresetRow("Morgen früh · 09:00") { onPick(tomorrowAt(9, 0), rule) }
+            PresetRow("In 1 Stunde", modifier = Modifier.sheetItemEnter(1)) { onPick(inOneHour(), rule) }
+            PresetRow("Heute Abend · 20:00", modifier = Modifier.sheetItemEnter(2)) { onPick(todayAt(20, 0), rule) }
+            PresetRow("Morgen früh · 09:00", modifier = Modifier.sheetItemEnter(3)) { onPick(tomorrowAt(9, 0), rule) }
 
-            PresetRow("Eigene Zeit …", icon = Icons.Rounded.Schedule) { showCustom = true }
+            PresetRow("Eigene Zeit …", icon = Icons.Rounded.Schedule, modifier = Modifier.sheetItemEnter(4)) { showCustom = true }
 
             if (currentReminderAt != null) {
                 Row(
@@ -164,16 +169,25 @@ fun ReminderSheet(
 @Composable
 private fun RuleChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
-    val bg = if (selected) {
-        MaterialTheme.colorScheme.onBackground
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val fg = if (selected) {
-        MaterialTheme.colorScheme.background
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    // Auswahl blendet weich über statt hart umzuschalten.
+    val bg by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.onBackground
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "ruleChipBg",
+    )
+    val fg by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.background
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "ruleChipFg",
+    )
     Box(
         modifier = Modifier
             .paperPress(shape) { onClick() }
@@ -188,11 +202,12 @@ private fun RuleChip(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun PresetRow(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.NotificationsActive,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(RoundedCornerShape(14.dp)) { onClick() }
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))

@@ -7,8 +7,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
@@ -139,7 +144,9 @@ import com.papernotes.ui.components.WaxRed
 import com.papernotes.ui.components.WaxSealBreakOverlay
 import com.papernotes.ui.components.WaxSealBreakRequest
 import com.papernotes.ui.theme.PaperDimens
+import com.papernotes.ui.theme.PaperMotion
 import com.papernotes.ui.theme.ThemeViewModel
+import com.papernotes.ui.theme.sheetItemEnter
 import com.papernotes.util.PhotoStore
 import com.papernotes.util.ShareCardRenderer
 import com.papernotes.util.rememberPaperHaptics
@@ -425,14 +432,30 @@ fun NotesScreen(
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 6.dp),
                 )
 
-                if (!state.loaded) {
+                // Lade-, Leer- und Grid-Phase blenden weich über statt hart zu springen.
+                val uiPhase = when {
+                    !state.loaded -> GridPhase.LOADING
+                    state.notes.isEmpty() -> GridPhase.EMPTY
+                    else -> GridPhase.GRID
+                }
+                AnimatedContent(
+                    targetState = uiPhase,
+                    label = "gridPhase",
+                    transitionSpec = {
+                        fadeIn(
+                            tween(PaperMotion.DurLong, easing = PaperMotion.EaseEmphasizedDecel),
+                        ) togetherWith fadeOut(tween(PaperMotion.DurShortExit))
+                    },
+                ) { phase ->
+                if (phase == GridPhase.LOADING) {
                     // Während des ersten Ladens nur Hintergrund – kein „leer"-Aufblitzen.
                     Box(modifier = Modifier.fillMaxSize())
-                } else if (state.notes.isEmpty()) {
+                } else if (phase == GridPhase.EMPTY) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         EmptyState(modifier = Modifier.align(Alignment.Center))
                     }
                 } else {
+                Column {
                     val displayItems = if (arrangeMode) orderedItems else state.items
                     // Suche/Filter aktiv, aber jede Karte verblasst → ehrlicher Hinweis statt
                     // eines Grids voller blasser Tinte.
@@ -445,10 +468,24 @@ fun NotesScreen(
                                 .padding(top = 48.dp),
                         )
                     }
+                    // Beim Pinch-Zoom „setzt sich" das Papier kurz (Mini-Puls), statt hart umzubrechen.
+                    val gridSettle = remember { Animatable(1f) }
+                    var settledColumns by remember { mutableIntStateOf(columns) }
+                    LaunchedEffect(columns) {
+                        if (columns != settledColumns) {
+                            settledColumns = columns
+                            gridSettle.snapTo(0.98f)
+                            gridSettle.animateTo(1f, PaperMotion.SpringGentle)
+                        }
+                    }
                     LazyVerticalStaggeredGrid(
                         columns = StaggeredGridCells.Fixed(columns),
                         modifier = Modifier
                             .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = gridSettle.value
+                                scaleY = gridSettle.value
+                            }
                             .then(if (arrangeMode) Modifier else Modifier.transformable(transformState)),
                         userScrollEnabled = !arrangeMode,
                         contentPadding = PaddingValues(
@@ -463,7 +500,11 @@ fun NotesScreen(
                         items(displayItems, key = { it.key }) { item ->
                           val isDragged = item.key == draggingKey
                           val arrangeBox = Modifier
-                              .animateItem()
+                              .animateItem(
+                                  fadeInSpec = tween(PaperMotion.DurShort),
+                                  placementSpec = PaperMotion.SpringPlacement,
+                                  fadeOutSpec = tween(PaperMotion.DurShortExit),
+                              )
                               .then(
                                   if (arrangeMode) {
                                       Modifier
@@ -681,6 +722,8 @@ fun NotesScreen(
                           }
                         }
                     }
+                }
+                }
                 }
             }
 
@@ -1290,12 +1333,22 @@ private fun TopAction(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
-        )
+        // Icon-Wechsel als kurzer „Stempel"-Pop statt hartem Austausch.
+        AnimatedContent(
+            targetState = icon,
+            label = "topActionIcon",
+            transitionSpec = {
+                (fadeIn(tween(90)) + scaleIn(tween(90), initialScale = 0.7f)) togetherWith
+                    (fadeOut(tween(60)) + scaleOut(tween(60)))
+            },
+        ) { current ->
+            Icon(
+                imageVector = current,
+                contentDescription = description,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 
@@ -1332,11 +1385,14 @@ private fun EmptyState(modifier: Modifier = Modifier) {
     }
 }
 
+/** Phasen der Notiz-Fläche: erst laden, dann leer oder Grid. */
+private enum class GridPhase { LOADING, EMPTY, GRID }
+
 /** Hinweis, wenn Suche/Filter keine einzige Notiz treffen – statt nur blasser Tinte. */
 @Composable
 private fun NoMatchState(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.padding(horizontal = 32.dp),
+        modifier = modifier.sheetItemEnter(0).padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

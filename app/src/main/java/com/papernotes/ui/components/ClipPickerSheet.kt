@@ -1,6 +1,11 @@
 package com.papernotes.ui.components
 
 import com.papernotes.ui.theme.PaperDimens
+import com.papernotes.ui.theme.PaperMotion
+import com.papernotes.ui.theme.sheetItemEnter
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +17,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -75,8 +81,9 @@ fun ClipPickerSheet(
                     modifier = Modifier.heightIn(max = 420.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    items(candidates, key = { it.id }) { note ->
+                    itemsIndexed(candidates, key = { _, note -> note.id }) { index, note ->
                         ClipRow(
+                            modifier = Modifier.sheetItemEnter(index),
                             note = note,
                             clipped = note.id in clippedIds,
                             ink = ink,
@@ -95,15 +102,34 @@ private fun ClipRow(
     clipped: Boolean,
     ink: Color,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    // Klammer-Zustand blendet weich über statt hart umzuschalten.
+    val rowBg by animateColorAsState(
+        targetValue = if (clipped) ClipSteel.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant,
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "clipRowBg",
+    )
+    val badgeFill by animateFloatAsState(
+        targetValue = if (clipped) 0.25f else 0f,
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "clipBadgeFill",
+    )
+    val ringAlpha by animateFloatAsState(
+        targetValue = if (clipped) 0f else 1f,
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "clipBadgeRing",
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (clipped) ink else MaterialTheme.colorScheme.outline,
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "clipIconTint",
+    )
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(RoundedCornerShape(14.dp), onClick = onClick)
-            .background(
-                if (clipped) ClipSteel.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(14.dp),
-            )
+            .background(rowBg, RoundedCornerShape(14.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -112,19 +138,18 @@ private fun ClipRow(
         Box(
             modifier = Modifier
                 .size(24.dp)
-                .then(
-                    if (clipped) {
-                        Modifier.background(ClipSteel.copy(alpha = 0.25f), CircleShape)
-                    } else {
-                        Modifier.border(1.5.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                    },
+                .background(ClipSteel.copy(alpha = badgeFill), CircleShape)
+                .border(
+                    1.5.dp,
+                    MaterialTheme.colorScheme.outline.copy(alpha = ringAlpha),
+                    CircleShape,
                 ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Rounded.AttachFile,
                 contentDescription = null,
-                tint = if (clipped) ink else MaterialTheme.colorScheme.outline,
+                tint = iconTint,
                 modifier = Modifier.size(14.dp),
             )
         }

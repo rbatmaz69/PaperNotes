@@ -49,8 +49,13 @@ import androidx.compose.ui.unit.dp
 import com.papernotes.domain.model.MoodCategory
 import com.papernotes.domain.model.PaperStyle
 import com.papernotes.domain.model.earAccent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
 import com.papernotes.ui.theme.PaperDimens
+import com.papernotes.ui.theme.PaperMotion
 import com.papernotes.ui.theme.Terracotta
+import com.papernotes.ui.theme.sheetItemEnter
 
 /**
  * Bottom-Sheet als Kontext-Menü einer Notiz. Statt einer langen Liste sind die
@@ -111,11 +116,19 @@ fun MoodPickerSheet(
             )
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .sheetItemEnter(0),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 MoodCategory.entries.forEach { mood ->
                     val isSelected = mood == selected
+                    // Auswahlring blendet weich ein/aus.
+                    val ring by animateFloatAsState(
+                        targetValue = if (isSelected) 1f else 0f,
+                        animationSpec = tween(PaperMotion.DurMedium),
+                        label = "moodPickRing",
+                    )
                     Box(
                         modifier = Modifier
                             .size(44.dp)
@@ -125,11 +138,7 @@ fun MoodPickerSheet(
                                 this.selected = isSelected
                             }
                             .background(mood.earAccent(), CircleShape)
-                            .then(
-                                if (isSelected) {
-                                    Modifier.border(2.5.dp, ink, CircleShape)
-                                } else Modifier,
-                            ),
+                            .border(2.5.dp * ring, ink.copy(alpha = ring), CircleShape),
                     )
                 }
             }
@@ -137,11 +146,18 @@ fun MoodPickerSheet(
             // Papier-Liniierung wählen (Live-Vorschau je Swatch)
             SectionLabel("Papier")
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .sheetItemEnter(1),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 PaperStyle.entries.forEach { style ->
                     val isSelected = style == paper
+                    val ring by animateFloatAsState(
+                        targetValue = if (isSelected) 1f else 0f,
+                        animationSpec = tween(PaperMotion.DurMedium),
+                        label = "paperPickRing",
+                    )
                     Box(
                         modifier = Modifier
                             .size(48.dp)
@@ -155,11 +171,7 @@ fun MoodPickerSheet(
                                 RoundedCornerShape(8.dp),
                             )
                             .paperRuling(style, ink, spacing = 9.dp)
-                            .then(
-                                if (isSelected) {
-                                    Modifier.border(2.5.dp, ink, RoundedCornerShape(8.dp))
-                                } else Modifier,
-                            ),
+                            .border(2.5.dp * ring, ink.copy(alpha = ring), RoundedCornerShape(8.dp)),
                     )
                 }
             }

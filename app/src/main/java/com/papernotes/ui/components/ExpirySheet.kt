@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.papernotes.ui.theme.Terracotta
+import com.papernotes.ui.theme.sheetItemEnter
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -81,11 +82,11 @@ fun ExpirySheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            PresetRow("In 1 Stunde") { onPick(inHours(1)) }
-            PresetRow("Heute Abend · 20:00") { onPick(todayAt(20, 0)) }
-            PresetRow("Morgen früh · 09:00") { onPick(tomorrowAt(9, 0)) }
-            PresetRow("In 1 Woche") { onPick(inDays(7)) }
-            PresetRow("Eigene Zeit …", icon = Icons.Rounded.Schedule) { showCustom = true }
+            PresetRow("In 1 Stunde", modifier = Modifier.sheetItemEnter(0)) { onPick(inHours(1)) }
+            PresetRow("Heute Abend · 20:00", modifier = Modifier.sheetItemEnter(1)) { onPick(todayAt(20, 0)) }
+            PresetRow("Morgen früh · 09:00", modifier = Modifier.sheetItemEnter(2)) { onPick(tomorrowAt(9, 0)) }
+            PresetRow("In 1 Woche", modifier = Modifier.sheetItemEnter(3)) { onPick(inDays(7)) }
+            PresetRow("Eigene Zeit …", icon = Icons.Rounded.Schedule, modifier = Modifier.sheetItemEnter(4)) { showCustom = true }
 
             if (currentExpiresAt != null) {
                 Row(
@@ -128,11 +129,12 @@ fun ExpirySheet(
 private fun PresetRow(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.HourglassEmpty,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(RoundedCornerShape(14.dp)) { onClick() }
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))

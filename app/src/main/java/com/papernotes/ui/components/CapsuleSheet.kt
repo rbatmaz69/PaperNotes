@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.papernotes.ui.theme.Terracotta
+import com.papernotes.ui.theme.sheetItemEnter
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -71,10 +72,10 @@ fun CapsuleSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            PresetRow("In 1 Woche") { onPick(inDays(7)) }
-            PresetRow("In 1 Monat") { onPick(inMonths(1)) }
-            PresetRow("In 1 Jahr") { onPick(inYears(1)) }
-            PresetRow("Eigenes Datum …", icon = Icons.Rounded.Schedule) { showCustom = true }
+            PresetRow("In 1 Woche", modifier = Modifier.sheetItemEnter(0)) { onPick(inDays(7)) }
+            PresetRow("In 1 Monat", modifier = Modifier.sheetItemEnter(1)) { onPick(inMonths(1)) }
+            PresetRow("In 1 Jahr", modifier = Modifier.sheetItemEnter(2)) { onPick(inYears(1)) }
+            PresetRow("Eigenes Datum …", icon = Icons.Rounded.Schedule, modifier = Modifier.sheetItemEnter(3)) { showCustom = true }
 
             if (currentCapsuleAt != null) {
                 Row(
@@ -121,11 +122,12 @@ fun CapsuleSheet(
 private fun PresetRow(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.LockClock,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(RoundedCornerShape(14.dp)) { onClick() }
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))

@@ -1,6 +1,10 @@
 package com.papernotes.ui.components
 
 import com.papernotes.ui.theme.PaperDimens
+import com.papernotes.ui.theme.PaperMotion
+import com.papernotes.ui.theme.sheetItemEnter
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -63,6 +68,7 @@ fun SortSheet(
                 label = "Pinnwand",
                 hint = "frei angeordnet, zuletzt bearbeitet zuerst",
                 selected = selected == SortMode.PINNWAND,
+                modifier = Modifier.sheetItemEnter(0),
             ) {
                 haptics.tap()
                 onPick(SortMode.PINNWAND)
@@ -71,6 +77,7 @@ fun SortSheet(
                 label = "Zuletzt erstellt",
                 hint = "neueste Zettel zuerst",
                 selected = selected == SortMode.CREATED,
+                modifier = Modifier.sheetItemEnter(1),
             ) {
                 haptics.tap()
                 onPick(SortMode.CREATED)
@@ -79,6 +86,7 @@ fun SortSheet(
                 label = "Titel A–Z",
                 hint = "alphabetisch nach Titel",
                 selected = selected == SortMode.TITLE,
+                modifier = Modifier.sheetItemEnter(2),
             ) {
                 haptics.tap()
                 onPick(SortMode.TITLE)
@@ -89,6 +97,7 @@ fun SortSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .sheetItemEnter(3)
                     .padding(top = 10.dp)
                     .paperPress(RoundedCornerShape(14.dp)) {
                         haptics.tap()
@@ -125,21 +134,25 @@ private fun SortRow(
     label: String,
     hint: String,
     selected: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val ink = MaterialTheme.colorScheme.onBackground
+    // Auswahlwechsel blendet weich über statt hart umzuschalten.
+    val rowBg by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
+        animationSpec = tween(PaperMotion.DurMedium),
+        label = "sortRowBg",
+    )
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(RoundedCornerShape(14.dp), onClick = onClick)
-            .background(
-                if (selected) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant
-                },
-                RoundedCornerShape(14.dp),
-            )
+            .background(rowBg, RoundedCornerShape(14.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

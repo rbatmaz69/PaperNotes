@@ -27,10 +27,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,8 +45,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.papernotes.domain.model.Note
 import com.papernotes.domain.model.cardSurface
 import com.papernotes.domain.model.earAccent
+import androidx.compose.animation.core.tween
 import com.papernotes.ui.components.PaperBackground
 import com.papernotes.ui.components.paperPress
+import com.papernotes.ui.theme.PaperMotion
+import com.papernotes.ui.theme.sheetItemEnter
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -98,20 +107,43 @@ fun AgendaScreen(
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    // Laufender Index über alle Zeilen für die gestaffelte Entrance.
+                    var stagger = 0
                     sections.forEach { section ->
+                        val headerIndex = stagger++
                         item(key = "h-${section.title}") {
                             Text(
                                 text = section.title,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.outline,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
+                                modifier = Modifier
+                                    .animateItem(
+                                        fadeInSpec = tween(PaperMotion.DurShort),
+                                        placementSpec = PaperMotion.SpringPlacement,
+                                        fadeOutSpec = tween(PaperMotion.DurShortExit),
+                                    )
+                                    .sheetItemEnter(headerIndex)
+                                    .padding(top = 12.dp, bottom = 2.dp),
                             )
                         }
+                        val firstEntryIndex = stagger
+                        stagger += section.entries.size
                         items(
                             section.entries,
                             key = { "${section.title}-${it.note.id}-${it.kind}" },
                         ) { entry ->
-                            AgendaCard(entry = entry, onClick = { onOpenNote(entry.note.id) })
+                            val entryIndex = firstEntryIndex + section.entries.indexOf(entry)
+                            AgendaCard(
+                                entry = entry,
+                                onClick = { onOpenNote(entry.note.id) },
+                                modifier = Modifier
+                                    .animateItem(
+                                        fadeInSpec = tween(PaperMotion.DurShort),
+                                        placementSpec = PaperMotion.SpringPlacement,
+                                        fadeOutSpec = tween(PaperMotion.DurShortExit),
+                                    )
+                                    .sheetItemEnter(entryIndex),
+                            )
                         }
                     }
                 }
@@ -121,11 +153,11 @@ fun AgendaScreen(
 }
 
 @Composable
-private fun AgendaCard(entry: AgendaEntry, onClick: () -> Unit) {
+private fun AgendaCard(entry: AgendaEntry, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val note = entry.note
     val shape = RoundedCornerShape(14.dp)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .paperPress(shape, onClick = onClick)
             .background(note.mood.cardSurface(), shape)
@@ -133,9 +165,21 @@ private fun AgendaCard(entry: AgendaEntry, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Badge ploppt beim Erscheinen kurz auf (0.6 → 1 mit Feder).
+        var badgeIn by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { badgeIn = true }
+        val badgeScale by animateFloatAsState(
+            targetValue = if (badgeIn) 1f else 0.6f,
+            animationSpec = PaperMotion.SpringPop,
+            label = "agendaBadgePop",
+        )
         Box(
             modifier = Modifier
                 .size(34.dp)
+                .graphicsLayer {
+                    scaleX = badgeScale
+                    scaleY = badgeScale
+                }
                 .background(note.mood.earAccent().copy(alpha = 0.35f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
