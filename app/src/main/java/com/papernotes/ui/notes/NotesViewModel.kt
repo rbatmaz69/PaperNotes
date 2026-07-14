@@ -48,6 +48,9 @@ data class UndoEvent(
     val noteIds: List<Long>,
 )
 
+/** Kurzlebige Info-Meldung (ohne Undo) für den Papierstreifen-Snackbar. */
+data class PaperMessage(val id: Long, val text: String)
+
 data class NotesUiState(
     val notes: List<GridNote> = emptyList(),
     val items: List<GridItem> = emptyList(),
@@ -103,15 +106,17 @@ class NotesViewModel @Inject constructor(
                 _selectedIds.update { it intersect visible }
             }
         }
-        // Einmaliger Langdruck-Hinweis: erst ab dem 3. Start, nur solange er nie gezeigt
-        // wurde und es überhaupt mehrere Zettel zum Auswählen gibt.
+        // Einmalige Papier-Tipps: pro App-Start höchstens einer, gestaffelt über die
+        // Sessions (siehe nextHint). Der Langdruck-Tipp wartet zusätzlich, bis es
+        // überhaupt mehrere Zettel zum Auswählen gibt.
         viewModelScope.launch {
             val opens = settingsPreferences.incrementAppOpens()
-            if (opens >= 3 && !settingsPreferences.longPressHintSeen.first()) {
-                if (repository.observeActiveNotes().first().size >= 2) {
-                    _longPressHint.value = true
-                }
+            val seen = settingsPreferences.hintsSeen.first()
+            val hint = nextHint(opens, seen) ?: return@launch
+            if (hint == PaperHint.LONG_PRESS && repository.observeActiveNotes().first().size < 2) {
+                return@launch
             }
+            _activeHint.value = hint
         }
     }
 
@@ -120,16 +125,17 @@ class NotesViewModel @Inject constructor(
     private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
     val selectedIds: StateFlow<Set<Long>> = _selectedIds
 
-    private val _longPressHint = MutableStateFlow(false)
-    /** true, wenn der einmalige „Halte einen Zettel gedrückt"-Tipp gezeigt werden soll. */
-    val longPressHint: StateFlow<Boolean> = _longPressHint
+    private val _activeHint = MutableStateFlow<PaperHint?>(null)
+    /** Der Papier-Tipp, der diese Session gezeigt werden soll (null: keiner fällig). */
+    val activeHint: StateFlow<PaperHint?> = _activeHint
 
     private var longPressUsed = false
 
-    /** Blendet den Tipp aus und merkt sich dauerhaft, dass er erledigt ist. */
-    fun dismissLongPressHint() {
-        _longPressHint.value = false
-        viewModelScope.launch { settingsPreferences.markLongPressHintSeen() }
+    /** Blendet den aktiven Tipp aus und merkt sich dauerhaft, dass er erledigt ist. */
+    fun dismissHint() {
+        val hint = _activeHint.value ?: return
+        _activeHint.value = null
+        viewModelScope.launch { settingsPreferences.markHintSeen(hint.key) }
     }
 
     /** Toggelt die Auswahl; Stapel werden als Einheit gewählt/abgewählt. */
@@ -137,8 +143,8 @@ class NotesViewModel @Inject constructor(
         // Auswahl selbst entdeckt → Tipp ist überflüssig, stumm als gesehen markieren.
         if (!longPressUsed) {
             longPressUsed = true
-            if (_longPressHint.value) _longPressHint.value = false
-            viewModelScope.launch { settingsPreferences.markLongPressHintSeen() }
+            if (_activeHint.value == PaperHint.LONG_PRESS) _activeHint.value = null
+            viewModelScope.launch { settingsPreferences.markHintSeen(PaperHint.LONG_PRESS.key) }
         }
         val ids = when (item) {
             is SoloItem -> setOf(item.gridNote.note.id)
@@ -462,6 +468,18 @@ class NotesViewModel @Inject constructor(
     }
 
     fun dismissUndo(id: Long) = _undoEvent.update { if (it?.id == id) null else it }
+
+    // Info-Streifen: gleiche Mechanik wie das Undo-Event, nur ohne Aktion dahinter –
+    // ersetzt die früheren Android-Toasts (Sicherung, Zeitkapsel) für einheitliches Feedback.
+    private var messageCounter = 0L
+    private val _message = MutableStateFlow<PaperMessage?>(null)
+    val message: StateFlow<PaperMessage?> = _message
+
+    fun showMessage(text: String) {
+        _message.value = PaperMessage(++messageCounter, text)
+    }
+
+    fun dismissMessage(id: Long) = _message.update { if (it?.id == id) null else it }
 
     fun markDelightPulled() = viewModelScope.launch { delightPreferences.markPulledToday() }
 

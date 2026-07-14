@@ -141,7 +141,8 @@ fun NotesScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val undoEvent by viewModel.undoEvent.collectAsStateWithLifecycle()
-    val longPressHint by viewModel.longPressHint.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val activeHint by viewModel.activeHint.collectAsStateWithLifecycle()
     val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
     val currentTheme by themeViewModel.theme.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -230,20 +231,20 @@ fun NotesScreen(
     }
 
     // Sicherung: ZIP schreiben/lesen über die System-Dateiauswahl (keine Berechtigung nötig).
-    fun backupToast(count: Int, exporting: Boolean) {
+    fun backupMessage(count: Int, exporting: Boolean) {
         val msg = when {
-            count < 0 -> "Sicherung fehlgeschlagen"
-            exporting -> "$count Notizen gesichert"
-            else -> "$count Notizen importiert"
+            count < 0 -> context.getString(R.string.backup_failed)
+            exporting -> context.getString(R.string.backup_exported, count)
+            else -> context.getString(R.string.backup_imported, count)
         }
-        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+        viewModel.showMessage(msg)
     }
     val createBackup = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
-    ) { uri -> uri?.let { viewModel.exportBackup(context, it) { n -> backupToast(n, exporting = true) } } }
+    ) { uri -> uri?.let { viewModel.exportBackup(context, it) { n -> backupMessage(n, exporting = true) } } }
     val openBackup = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
-    ) { uri -> uri?.let { viewModel.importBackup(context, it) { n -> backupToast(n, exporting = false) } } }
+    ) { uri -> uri?.let { viewModel.importBackup(context, it) { n -> backupMessage(n, exporting = false) } } }
 
     // Welche Karten schon „eingeflogen" sind – neue Notizen fallen einmalig herein.
     val introducedIds = remember { mutableStateMapOf<Long, Unit>() }
@@ -554,11 +555,9 @@ fun NotesScreen(
                                                             "d. MMM yyyy",
                                                             java.util.Locale.GERMAN,
                                                         ).format(note.capsuleAt!!)
-                                                        android.widget.Toast.makeText(
-                                                            context,
-                                                            "Versiegelt bis $day",
-                                                            android.widget.Toast.LENGTH_SHORT,
-                                                        ).show()
+                                                        viewModel.showMessage(
+                                                            context.getString(R.string.capsule_locked_until, day),
+                                                        )
                                                     }
                                                     note.sealed -> {
                                                         cardBounds[note.id]?.let { b ->
@@ -891,29 +890,71 @@ fun NotesScreen(
                 }
             }
 
-            // Einmaliger Papier-Tipp: Langdruck öffnet die Mehrfachauswahl. Weicht dem
-            // Undo-Streifen und verschwindet nach kurzer Zeit von selbst.
+            // Info-Streifen (Sicherung, Zeitkapsel …): gleiche Stelle wie der Undo-Streifen,
+            // der bei Gleichzeitigkeit Vorrang hat.
+            var lastMessage by remember { mutableStateOf<PaperMessage?>(null) }
+            if (message != null) lastMessage = message
             AnimatedVisibility(
-                visible = longPressHint && undoEvent == null && !selectionMode,
+                visible = message != null && undoEvent == null,
                 enter = slideInVertically { it * 2 } + fadeIn(),
                 exit = slideOutVertically { it * 2 } + fadeOut(),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = contentPadding.calculateBottomPadding() + 56.dp),
             ) {
-                PaperSnackbar(
-                    message = stringResource(R.string.hint_long_press),
-                    actionLabel = stringResource(R.string.hint_long_press_ok),
-                    onAction = {
-                        haptics.tap()
-                        viewModel.dismissLongPressHint()
-                    },
-                )
+                lastMessage?.let { event ->
+                    PaperSnackbar(
+                        message = event.text,
+                        actionLabel = stringResource(R.string.snackbar_ok),
+                        onAction = {
+                            haptics.tap()
+                            viewModel.dismissMessage(event.id)
+                        },
+                    )
+                }
             }
-            if (longPressHint) {
+            message?.let { event ->
+                LaunchedEffect(event.id) {
+                    kotlinx.coroutines.delay(4000)
+                    viewModel.dismissMessage(event.id)
+                }
+            }
+
+            // Einmalige Papier-Tipps (Langdruck, Eselsohr, Pinch …), einer pro Session.
+            // Weicht Undo- und Info-Streifen und verschwindet nach kurzer Zeit von selbst.
+            var lastHint by remember { mutableStateOf<PaperHint?>(null) }
+            if (activeHint != null) lastHint = activeHint
+            AnimatedVisibility(
+                visible = activeHint != null && undoEvent == null && message == null && !selectionMode,
+                enter = slideInVertically { it * 2 } + fadeIn(),
+                exit = slideOutVertically { it * 2 } + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = contentPadding.calculateBottomPadding() + 56.dp),
+            ) {
+                lastHint?.let { hint ->
+                    PaperSnackbar(
+                        message = stringResource(
+                            when (hint) {
+                                PaperHint.LONG_PRESS -> R.string.hint_long_press
+                                PaperHint.DOG_EAR -> R.string.hint_dog_ear
+                                PaperHint.PINCH_COLUMNS -> R.string.hint_pinch_columns
+                                PaperHint.BACK_FLIP -> R.string.hint_back_flip
+                                PaperHint.TEABAG -> R.string.hint_teabag
+                            },
+                        ),
+                        actionLabel = stringResource(R.string.hint_long_press_ok),
+                        onAction = {
+                            haptics.tap()
+                            viewModel.dismissHint()
+                        },
+                    )
+                }
+            }
+            if (activeHint != null) {
                 LaunchedEffect(Unit) {
                     kotlinx.coroutines.delay(8000)
-                    viewModel.dismissLongPressHint()
+                    viewModel.dismissHint()
                 }
             }
         }

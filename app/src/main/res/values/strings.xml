@@ -15,4 +15,14 @@
     <string name="hint_long_press">Tipp: Halte einen Zettel gedrückt, um mehrere auszuwählen.</string>
     <string name="hint_long_press_ok">Verstanden</string>
     <string name="reminder_muted_hint">Benachrichtigungen sind aus – dieser Zettel bleibt stumm.</string>
+    <string name="reminder_inexact_hint">Exakte Wecker sind nicht erlaubt – Erinnerungen können sich um einige Minuten verzögern.</string>
+    <string name="backup_failed">Sicherung fehlgeschlagen</string>
+    <string name="backup_exported">%1$d Notizen gesichert</string>
+    <string name="backup_imported">%1$d Notizen importiert</string>
+    <string name="capsule_locked_until">Versiegelt bis %1$s</string>
+    <string name="snackbar_ok">OK</string>
+    <string name="hint_dog_ear">Tipp: Halte das Eselsohr gedrückt für alle Aktionen einer Notiz.</string>
+    <string name="hint_pinch_columns">Tipp: Ziehe zwei Finger auseinander, um die Spalten zu ändern.</string>
+    <string name="hint_back_flip">Tipp: Die kleine Ecke unten links blättert den Zettel um.</string>
+    <string name="hint_teabag">Tipp: Zieh am Teebeutel oben für deinen Glücksmoment.</string>
 </resources>

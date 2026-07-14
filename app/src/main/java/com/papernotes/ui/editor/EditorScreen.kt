@@ -296,14 +296,14 @@ fun EditorScreen(
                       } else {
                         // Radiergummi & Durchschlag: Schritt zurück / wieder vor.
                         // Immer komponiert, damit die Nachbar-Symbole nicht springen –
-                        // die Icons blenden nur ein/aus wie trocknende Tinte.
+                        // inaktiv bleiben sie als verblasste Tinte sichtbar.
                         val undoAlpha by animateFloatAsState(
-                            targetValue = if (canUndo) 1f else 0f,
+                            targetValue = if (canUndo) 1f else 0.3f,
                             animationSpec = tween(220),
                             label = "undoAlpha",
                         )
                         val redoAlpha by animateFloatAsState(
-                            targetValue = if (canRedo) 1f else 0f,
+                            targetValue = if (canRedo) 1f else 0.3f,
                             animationSpec = tween(220),
                             label = "redoAlpha",
                         )

@@ -99,6 +99,19 @@ fun ReminderSheet(
                     color = MaterialTheme.colorScheme.outline,
                 )
             }
+            // Exakte Wecker entzogen? Dann fällt der Scheduler still auf ungefähre
+            // Alarme zurück – das hier ist die einzige Stelle, die es dem Nutzer sagt.
+            val exactUnavailable = remember {
+                !(context.getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager)
+                    .canScheduleExactAlarms()
+            }
+            if (exactUnavailable) {
+                Text(
+                    text = stringResource(R.string.reminder_inexact_hint),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
 
             if (currentReminderAt != null) {
                 Text(

@@ -38,6 +38,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -289,6 +291,28 @@ fun NoteCard(
                 onLongPress = onPickMood,
                 modifier = Modifier.align(Alignment.TopEnd),
             )
+
+            // Sichtbarer Einstieg ins Aktions-Sheet: drei zarte Tintenpunkte unten rechts –
+            // dasselbe Menü wie der (weiter unterstützte) Langdruck aufs Eselsohr.
+            // Weicht der eingerollten Ecke nach oben aus, wenn die Notiz abläuft.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(y = if (age > 0f) (-28).dp else 0.dp)
+                    .size(40.dp)
+                    .semantics { contentDescription = "Aktionen" }
+                    .paperPress(RoundedCornerShape(50), onClick = {
+                        haptics.tap()
+                        onPickMood()
+                    }),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "⋮",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                )
+            }
           } else {
             BackFace(
                 text = note.backText,

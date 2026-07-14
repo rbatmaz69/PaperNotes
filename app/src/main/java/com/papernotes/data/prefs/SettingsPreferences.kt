@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -64,12 +65,19 @@ class SettingsPreferences @Inject constructor(
         return prefs[appOpensPref] ?: 0
     }
 
-    /** true, sobald der Langdruck-Hinweis gezeigt oder die Auswahl selbst entdeckt wurde. */
-    val longPressHintSeen: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
-        prefs[longPressHintSeenPref] ?: false
+    private val hintsSeenPref = stringSetPreferencesKey("hints_seen")
+
+    /**
+     * Schlüssel aller bereits gezeigten (oder selbst entdeckten) Papier-Tipps.
+     * Migration: das alte Boolean `longpress_hint_seen` zählt als gesehener "longpress"-Tipp,
+     * damit Bestandsnutzer den Langdruck-Hinweis nicht erneut sehen.
+     */
+    val hintsSeen: Flow<Set<String>> = context.settingsDataStore.data.map { prefs ->
+        val seen = prefs[hintsSeenPref] ?: emptySet()
+        if (prefs[longPressHintSeenPref] == true) seen + "longpress" else seen
     }
 
-    suspend fun markLongPressHintSeen() {
-        context.settingsDataStore.edit { it[longPressHintSeenPref] = true }
+    suspend fun markHintSeen(key: String) {
+        context.settingsDataStore.edit { it[hintsSeenPref] = (it[hintsSeenPref] ?: emptySet()) + key }
     }
 }
