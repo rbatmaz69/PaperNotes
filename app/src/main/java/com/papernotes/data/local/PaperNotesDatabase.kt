@@ -8,7 +8,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [NoteEntity::class, NoteLinkEntity::class],
     version = 17,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class PaperNotesDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
