@@ -1,2 +1,0 @@
-
-+adb-ZY22M5XPRX-CKBb3k._adb-tls-connect._tcp36àÂÄ’+*	arm64-v8a2motorola:+adb-ZY22M5XPRX-CKBb3k._adb-tls-connect._tcpRmotorola edge 70

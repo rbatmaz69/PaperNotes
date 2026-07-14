@@ -10,6 +10,7 @@
 *.apk
 *.aab
 app/build/
+baselineprofile/build/
 
 # Release-Signing: Schlüssel und Passwörter bleiben lokal
 /keystore.properties

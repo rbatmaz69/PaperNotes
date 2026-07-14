@@ -1,6 +1,0 @@
-BaselineProfileGenerator_generate
-Total run time Ns: 99570271160.
-Baseline profile [results](file://BaselineProfileGenerator_generate-startup-prof-2026-06-11-23-40-53.txt)
-
-To copy the profile use:
-adb -s ZY22M5XPRX pull "/sdcard/Android/media/com.papernotes.baselineprofile/additional_test_output/BaselineProfileGenerator_generate-startup-prof.txt" .
