@@ -129,8 +129,8 @@ baselineprofile/  Macrobenchmark, der das Baseline-/Startup-Profil erzeugt
 
 ## 🚀 Bauen & Starten
 Voraussetzung: Android Studio (Ladybug+) oder Android SDK 35 + **JDK 17**.
-Es liegt **kein `gradlew`-Wrapper** im Repo — gebaut wird mit einem installierten `gradle`
-(z. B. via Homebrew). Vorher die Umgebung setzen:
+Gebaut wird mit dem eingecheckten **`gradlew`-Wrapper** — keine lokale Gradle-Installation nötig.
+Vorher die Umgebung setzen:
 
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
@@ -139,7 +139,7 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 
 ### ✏️ Debug (schnell iterieren)
 ```bash
-gradle :app:installDebug   # baut & installiert auf Gerät/Emulator (API 33+)
+./gradlew :app:installDebug   # baut & installiert auf Gerät/Emulator (API 33+)
 ```
 In Android Studio: Projekt öffnen → Gerät (API 33+) → **Run**.
 
@@ -150,7 +150,7 @@ In Android Studio: Projekt öffnen → Gerät (API 33+) → **Run**.
 Der `release`-Build (R8 + Shrinking) ist mit dem Debug-Schlüssel signiert, also ohne eigenes
 Keystore direkt installierbar:
 ```bash
-gradle :app:installRelease
+./gradlew :app:installRelease
 ```
 In Android Studio alternativ **Build → Select Build Variant → `:app` → `release`**, dann **Run**.
 (WLAN-Debugging geht genauso — `adb` sieht das Gerät.)
@@ -160,7 +160,7 @@ Ein eingecheckter Profil-Datensatz (`app/src/release/generated/baselineProfiles/
 Release-Build automatisch eingebacken — **pro Build kein Schritt nötig.** Neu erzeugen lohnt nur
 nach größeren UI-Umbauten (Gerät verbunden):
 ```bash
-gradle :app:generateBaselineProfile
+./gradlew :app:generateBaselineProfile
 ```
 ProfileInstaller wendet es kurz nach dem ersten Start an (der **zweite** Kaltstart ist der
 schnellste). Sofort erzwingen:
