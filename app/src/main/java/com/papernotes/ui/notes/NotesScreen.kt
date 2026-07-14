@@ -11,13 +11,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.LinearEasing
@@ -54,7 +51,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Event
@@ -62,8 +58,6 @@ import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SwapVert
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -84,10 +78,8 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -98,7 +90,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -107,46 +98,28 @@ import com.papernotes.R
 import com.papernotes.domain.model.Note
 import com.papernotes.domain.model.NoteType
 import com.papernotes.domain.model.cardSurface
-import com.papernotes.domain.model.earAccent
 import com.papernotes.domain.toShareText
 import com.papernotes.ui.components.AddFab
-import com.papernotes.ui.components.ArchiveDrawerSheet
-import com.papernotes.ui.components.ConfettiBurst
-import com.papernotes.ui.components.CrumpleOverlay
 import com.papernotes.ui.components.CrumpleRequest
 import com.papernotes.ui.components.DrawerHandle
-import com.papernotes.ui.components.ExpirySheet
 import com.papernotes.ui.components.InkSearchBar
 import com.papernotes.ui.components.MoodFilterRow
-import com.papernotes.ui.components.MoodOnlySheet
-import com.papernotes.ui.components.MoodPickerSheet
 import com.papernotes.ui.components.SelectionBar
 import com.papernotes.ui.components.SelectionPin
 import com.papernotes.ui.components.TagFilterRow
-import com.papernotes.ui.components.TagPickerSheet
-import com.papernotes.ui.components.ClipPickerSheet
-import com.papernotes.ui.components.CapsuleSheet
-import com.papernotes.ui.components.CountdownSheet
 import com.papernotes.ui.components.NoteCard
-import com.papernotes.ui.components.NoteLinkPickerSheet
 import com.papernotes.ui.components.NoteStack
 import com.papernotes.ui.components.PaperBackground
-import com.papernotes.ui.components.PaperPlaneOverlay
 import com.papernotes.ui.components.PaperPlaneRequest
 import com.papernotes.ui.components.PaperSnackbar
-import com.papernotes.ui.components.SortSheet
 import com.papernotes.ui.components.RedThreadOverlay
 import com.papernotes.ui.components.paperPress
-import com.papernotes.ui.components.ReminderSheet
-import com.papernotes.ui.components.SettingsSheet
 import com.papernotes.ui.components.TeabagPull
 import com.papernotes.ui.components.WaxRed
-import com.papernotes.ui.components.WaxSealBreakOverlay
 import com.papernotes.ui.components.WaxSealBreakRequest
 import com.papernotes.ui.theme.PaperDimens
 import com.papernotes.ui.theme.PaperMotion
 import com.papernotes.ui.theme.ThemeViewModel
-import com.papernotes.ui.theme.sheetItemEnter
 import com.papernotes.util.PhotoStore
 import com.papernotes.util.ShareCardRenderer
 import com.papernotes.util.rememberPaperHaptics
@@ -172,7 +145,6 @@ fun NotesScreen(
     val sortMode by viewModel.sortMode.collectAsStateWithLifecycle()
     val currentTheme by themeViewModel.theme.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
 
     // Leichter Zeit-Ticker: lässt fällige Erinnerungen live ins „Flattern" übergehen.
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -235,18 +207,8 @@ fun NotesScreen(
     // Position jeder Karte (Root-Koordinaten) – für die Knüddel-Animation UND die roten
     // Fäden. Snapshot-Map, damit das Faden-Overlay beim Scrollen/Zoomen live nachzeichnet.
     val cardBounds = remember { mutableStateMapOf<Long, Rect>() }
-    var crumple by remember { mutableStateOf<CrumpleRequest?>(null) }
-    var sealBreak by remember { mutableStateOf<WaxSealBreakRequest?>(null) }
-    var shareRequest by remember { mutableStateOf<PaperPlaneRequest?>(null) }
-    var shareText by remember { mutableStateOf("") }
-    var shareUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    var moodTarget by remember { mutableStateOf<Note?>(null) }
-    var tagTarget by remember { mutableStateOf<Note?>(null) }
-    var linkTarget by remember { mutableStateOf<Note?>(null) }
-    var clipTarget by remember { mutableStateOf<Note?>(null) }
-    var expiryTarget by remember { mutableStateOf<Note?>(null) }
-    var countdownTarget by remember { mutableStateOf<Note?>(null) }
-    var capsuleTarget by remember { mutableStateOf<Note?>(null) }
+    val overlays = remember { NotesOverlayState() }
+    val sheets = remember { NotesSheetState() }
 
     // Foto-Picker (System-Auswahl, keine Berechtigung): wählt ein Bild für photoTarget.
     val scope = rememberCoroutineScope()
@@ -295,25 +257,17 @@ fun NotesScreen(
     }
 
     // Stempel-Meilenstein → Konfetti.
-    var stampConfettiKey by remember { mutableIntStateOf(0) }
-    var showStampConfetti by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         viewModel.stampMilestone.collect {
-            stampConfettiKey++
-            showStampConfetti = true
+            overlays.stampConfettiKey++
+            overlays.showStampConfetti = true
         }
     }
-    var reminderTarget by remember { mutableStateOf<Note?>(null) }
-    var drawerOpen by remember { mutableStateOf(false) }
     var fabExpanded by remember { mutableStateOf(false) }
-    var settingsSheetOpen by remember { mutableStateOf(false) }
-    var sortSheetOpen by remember { mutableStateOf(false) }
 
     // Mehrfachauswahl: Long-Press auf eine Karte betritt den Modus, Tap toggelt weitere.
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val selectionMode = selectedIds.isNotEmpty()
-    var selectionMoodOpen by remember { mutableStateOf(false) }
-    var selectionTagOpen by remember { mutableStateOf(false) }
 
     BackHandler(enabled = selectionMode) { viewModel.clearSelection() }
 
@@ -385,10 +339,10 @@ fun NotesScreen(
     val expiringSurface = expiring?.mood?.cardSurface()
     LaunchedEffect(expiring?.id, now) {
         val note = expiring ?: return@LaunchedEffect
-        if (crumple != null) return@LaunchedEffect
+        if (overlays.crumple != null) return@LaunchedEffect
         val bounds = cardBounds[note.id]
         if (bounds != null && expiringSurface != null) {
-            crumple = CrumpleRequest(note.id, bounds, expiringSurface)
+            overlays.crumple = CrumpleRequest(note.id, bounds, expiringSurface)
         } else {
             viewModel.moveToTrash(note.id)
         }
@@ -559,7 +513,7 @@ fun NotesScreen(
                             is SoloItem -> {
                             val gridNote = item.gridNote
                             val note = gridNote.note
-                            val hidden = crumple?.noteId == note.id
+                            val hidden = overlays.crumple?.noteId == note.id
 
                             // Neue Notiz fällt einmalig federnd ins Grid.
                             val willDrop = introSeeded && note.id !in introducedIds
@@ -608,14 +562,14 @@ fun NotesScreen(
                                                     }
                                                     note.sealed -> {
                                                         cardBounds[note.id]?.let { b ->
-                                                            sealBreak = WaxSealBreakRequest(note.id, b, WaxRed)
+                                                            overlays.sealBreak = WaxSealBreakRequest(note.id, b, WaxRed)
                                                         } ?: onOpenNote(note.id)
                                                     }
                                                     else -> onOpenNote(note.id)
                                                 }
                                             },
                                             onToggleDogEar = { if (!arrangeMode && !selectionMode) viewModel.toggleDogEar(note) },
-                                            onPickMood = { if (!arrangeMode && !selectionMode) moodTarget = note },
+                                            onPickMood = { if (!arrangeMode && !selectionMode) sheets.moodTarget = note },
                                             // Long-Press betritt die Mehrfachauswahl (Pinnen bleibt
                                             // über das Eselsohr-Sheet und als Stapel-Aktion erreichbar).
                                             onLongPress = {
@@ -624,7 +578,7 @@ fun NotesScreen(
                                                     viewModel.toggleSelected(item)
                                                 }
                                             },
-                                            onCountdown = { if (!arrangeMode && !selectionMode) countdownTarget = note },
+                                            onCountdown = { if (!arrangeMode && !selectionMode) sheets.countdownTarget = note },
                                             onToggleStampDay = { day -> if (!arrangeMode && !selectionMode) viewModel.toggleStamp(note, day) },
                                             modifier = Modifier
                                                 .graphicsLayer {
@@ -698,10 +652,10 @@ fun NotesScreen(
                                         }
                                     },
                                     onToggleDogEar = { if (!arrangeMode && !selectionMode) viewModel.toggleDogEar(it) },
-                                    onPickMood = { if (!arrangeMode && !selectionMode) moodTarget = it },
+                                    onPickMood = { if (!arrangeMode && !selectionMode) sheets.moodTarget = it },
                                     onToggleStampDay = { n, day -> if (!arrangeMode && !selectionMode) viewModel.toggleStamp(n, day) },
                                     onUnclip = { if (!arrangeMode && !selectionMode) viewModel.unclip(it) },
-                                    onCountdown = { if (!arrangeMode && !selectionMode) countdownTarget = it },
+                                    onCountdown = { if (!arrangeMode && !selectionMode) sheets.countdownTarget = it },
                                     modifier = Modifier,
                                 )
                             }
@@ -755,8 +709,8 @@ fun NotesScreen(
                         haptics.crumple()
                         viewModel.trashSelected()
                     },
-                    onMood = { selectionMoodOpen = true },
-                    onTag = { selectionTagOpen = true },
+                    onMood = { sheets.selectionMoodOpen = true },
+                    onTag = { sheets.selectionTagOpen = true },
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = contentPadding.calculateTopPadding() + 4.dp),
@@ -778,7 +732,7 @@ fun NotesScreen(
                 TopAction(
                     icon = Icons.Rounded.Settings,
                     description = "Einstellungen",
-                    onClick = { settingsSheetOpen = true },
+                    onClick = { sheets.settingsSheetOpen = true },
                 )
                 Spacer(Modifier.width(8.dp))
                 TopAction(
@@ -797,14 +751,14 @@ fun NotesScreen(
                     description = if (arrangeMode) "Anordnen beenden" else "Ordnen",
                     onClick = {
                         haptics.tap()
-                        if (arrangeMode) finishArrange() else sortSheetOpen = true
+                        if (arrangeMode) finishArrange() else sheets.sortSheetOpen = true
                     },
                 )
                 Spacer(Modifier.width(8.dp))
                 TopAction(
                     icon = Icons.Rounded.Inventory2,
                     description = "Archiv & Papierkorb",
-                    onClick = { drawerOpen = true },
+                    onClick = { sheets.drawerOpen = true },
                 )
             }
 
@@ -826,7 +780,7 @@ fun NotesScreen(
                 DrawerHandle(
                     archiveCount = state.archived.size,
                     trashCount = state.trashed.size,
-                    onOpen = { drawerOpen = true },
+                    onOpen = { sheets.drawerOpen = true },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = contentPadding.calculateBottomPadding() + 4.dp),
@@ -965,448 +919,59 @@ fun NotesScreen(
         }
     }
 
-    // Knüddel-Animation → Papierkorb
-    crumple?.let { req ->
-        CrumpleOverlay(
-            request = req,
-            onFinished = {
-                viewModel.moveToTrash(req.noteId)
-                crumple = null
-            },
-        )
-    }
-
-    // Papierflieger-Animation → Android-Teilen-Auswahl
-    shareRequest?.let { req ->
-        PaperPlaneOverlay(
-            request = req,
-            onFinished = {
-                val uri = shareUri
-                if (uri != null) context.shareImage(uri, shareText) else context.sharePlainText(shareText)
-                shareRequest = null
-                shareUri = null
-            },
-        )
-    }
-
-    // Wachssiegel zerspringt → öffnet die versiegelte Notiz
-    sealBreak?.let { req ->
-        WaxSealBreakOverlay(
-            request = req,
-            onFinished = {
-                onOpenNote(req.noteId)
-                sealBreak = null
-            },
-        )
-    }
-
-    // Stempel-Meilenstein: Konfetti über dem Grid
-    if (showStampConfetti) {
-        ConfettiBurst(trigger = stampConfettiKey, onFinished = { showStampConfetti = false })
-    }
-
-    // Stimmungs-/Pin-/Lösch-Sheet
-    moodTarget?.let { target ->
-        val targetSurface = target.mood.cardSurface()
-        val targetAccent = target.mood.earAccent()
-        val inkColor = MaterialTheme.colorScheme.onBackground
-        MoodPickerSheet(
-            selected = target.mood,
-            pinned = target.pinned,
-            hasReminder = target.hasReminder,
-            sealed = target.sealed,
-            invisibleInk = target.invisibleInk,
-            done = target.done,
-            hasExpiry = target.hasExpiry,
-            hasCountdown = target.hasCountdown,
-            hasCapsule = target.capsuleAt != null,
-            hasPhoto = target.hasPhoto,
-            paper = target.paper,
-            onPick = { mood ->
-                viewModel.setMood(target, mood)
-                moodTarget = null
-            },
-            onPickPaper = { style ->
-                viewModel.setPaper(target, style)
-                moodTarget = target.copy(paper = style) // Auswahl sofort im Sheet spiegeln
-            },
-            onTogglePin = {
-                viewModel.togglePin(target)
-                moodTarget = null
-            },
-            onToggleSeal = {
-                viewModel.toggleSeal(target)
-                moodTarget = null
-            },
-            onSetCapsule = {
-                moodTarget = null
-                capsuleTarget = target
-            },
-            onToggleInvisibleInk = {
-                viewModel.toggleInvisibleInk(target)
-                moodTarget = null
-            },
-            onToggleDone = {
-                viewModel.toggleDone(target)
-                moodTarget = null
-            },
-            onEditTags = {
-                moodTarget = null
-                tagTarget = target
-            },
-            onSetExpiry = {
-                expiryTarget = target
-                moodTarget = null
-            },
-            onSetReminder = {
-                moodTarget = null
-                reminderTarget = target
-            },
-            onSetCountdown = {
-                moodTarget = null
-                countdownTarget = target
-            },
-            onAttachPhoto = {
-                photoTarget = target
-                moodTarget = null
-                pickPhoto.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                )
-            },
-            onLink = {
-                moodTarget = null
-                linkTarget = target
-            },
-            onClip = {
-                moodTarget = null
-                clipTarget = target
-            },
-            onShare = {
-                val bounds = cardBounds[target.id]
-                moodTarget = null
-                shareText = target.toShareText()
-                val surfaceArgb = targetSurface.toArgb()
-                val inkArgb = inkColor.toArgb()
-                val accentArgb = targetAccent.toArgb()
-                scope.launch {
-                    val uri = withContext(Dispatchers.IO) {
-                        ShareCardRenderer.render(context, target, surfaceArgb, inkArgb, accentArgb)
-                    }
-                    shareUri = uri
-                    if (bounds != null) {
-                        shareRequest = PaperPlaneRequest(target.id, bounds, targetSurface)
-                    } else if (uri != null) {
-                        context.shareImage(uri, shareText)
-                    } else {
-                        context.sharePlainText(shareText)
-                    }
-                }
-            },
-            onCopy = {
-                clipboard.setText(AnnotatedString(target.toShareText()))
-                moodTarget = null
-            },
-            onDelete = {
-                val bounds = cardBounds[target.id]
-                moodTarget = null
-                if (bounds != null) {
-                    crumple = CrumpleRequest(target.id, bounds, targetSurface)
-                } else {
-                    viewModel.moveToTrash(target.id)
-                }
-            },
-            onDismiss = { moodTarget = null },
-        )
-    }
-
-    // Karteireiter-Sheet (vom Grid-Long-Press)
-    tagTarget?.let { target ->
-        // Live-Notiz, damit die Chip-Auswahl die letzte Änderung sofort spiegelt.
-        val live = state.notes.firstOrNull { it.note.id == target.id }?.note ?: target
-        TagPickerSheet(
-            noteTags = live.tagList,
-            allTags = state.presentTags,
-            onToggle = { tag -> viewModel.toggleTag(live, tag) },
-            onAdd = { tag -> viewModel.addTag(live, tag) },
-            onDismiss = { tagTarget = null },
-        )
-    }
-
-    // Erinnerungs-Sheet (vom Grid-Long-Press)
-    reminderTarget?.let { target ->
-        ReminderSheet(
-            currentReminderAt = target.reminderAt,
-            currentRule = target.reminderRule,
-            onPick = { at, rule ->
-                viewModel.setReminder(target, at, rule)
-                ensureNotificationPermission()
-                reminderTarget = null
-            },
-            onClear = {
-                viewModel.setReminder(target, null)
-                reminderTarget = null
-            },
-            onDismiss = { reminderTarget = null },
-        )
-    }
-
-    // Selbstzerstörung: Ablaufzeit der Notiz wählen/aufheben
-    expiryTarget?.let { target ->
-        ExpirySheet(
-            currentExpiresAt = target.expiresAt,
-            onPick = { at ->
-                viewModel.setExpiry(target, at)
-                expiryTarget = null
-            },
-            onClear = {
-                viewModel.setExpiry(target, null)
-                expiryTarget = null
-            },
-            onDismiss = { expiryTarget = null },
-        )
-    }
-
-    // Abreißkalender: Zieldatum der Notiz wählen/abreißen
-    countdownTarget?.let { target ->
-        CountdownSheet(
-            currentCountdownAt = target.countdownAt,
-            onPick = { at ->
-                viewModel.setCountdown(target, at)
-                countdownTarget = null
-            },
-            onClear = {
-                viewModel.setCountdown(target, null)
-                countdownTarget = null
-            },
-            onDismiss = { countdownTarget = null },
-        )
-    }
-
-    // Zeitkapsel: Notiz bis zu einem Datum versiegeln
-    capsuleTarget?.let { target ->
-        CapsuleSheet(
-            currentCapsuleAt = target.capsuleAt,
-            onPick = { at ->
-                viewModel.setCapsule(target, at)
-                capsuleTarget = null
-            },
-            onClear = {
-                viewModel.setCapsule(target, null)
-                capsuleTarget = null
-            },
-            onDismiss = { capsuleTarget = null },
-        )
-    }
-
-    // Roter-Faden-Auswahl: andere Notiz zum Verknüpfen/Lösen wählen
-    linkTarget?.let { target ->
-        val linkedIds = state.links
-            .filter { it.involves(target.id) }
-            .mapNotNull { it.otherEnd(target.id) }
-            .toSet()
-        NoteLinkPickerSheet(
-            candidates = state.notes.map { it.note }.filter { it.id != target.id },
-            linkedIds = linkedIds,
-            onToggle = { otherId ->
-                if (otherId in linkedIds) {
-                    viewModel.unlinkNotes(target.id, otherId)
-                } else {
-                    viewModel.linkNotes(target.id, otherId)
-                }
-            },
-            onDismiss = { linkTarget = null },
-        )
-    }
-
-    // Büroklammer-Auswahl: andere Notizen an den Stapel klammern/lösen
-    clipTarget?.let { target ->
-        val groupId = target.clipId ?: target.id
-        val clippedIds = state.notes
-            .map { it.note }
-            .filter { it.id != target.id && it.clipId == groupId }
-            .map { it.id }
-            .toSet()
-        ClipPickerSheet(
-            candidates = state.notes.map { it.note }.filter { it.id != target.id },
-            clippedIds = clippedIds,
-            onToggle = { otherId -> viewModel.toggleClip(target, otherId) },
-            onDismiss = { clipTarget = null },
-        )
-    }
-
-    // Ordnen: Sortierung wählen oder frei anordnen
-    if (sortSheetOpen) {
-        SortSheet(
-            selected = sortMode,
-            onPick = { mode ->
-                viewModel.setSortMode(mode)
-                sortSheetOpen = false
-            },
-            onArrange = {
-                // Freies Ziehen setzt die Sortierung auf Pinnwand zurück, sonst würde
-                // die aktive Auto-Sortierung die gezogene Reihenfolge sofort überstimmen.
-                viewModel.setSortMode(SortMode.PINNWAND)
-                viewModel.clearSelection()
-                arrangeMode = true
-                sortSheetOpen = false
-            },
-            onDismiss = { sortSheetOpen = false },
-        )
-    }
-
-    // Einstellungen-Zettel: Papier-Theme, Sicherung, Über
-    if (settingsSheetOpen) {
-        SettingsSheet(
-            selectedTheme = currentTheme,
-            onPickTheme = { themeViewModel.setTheme(it) },
-            onDismiss = { settingsSheetOpen = false },
-            onExport = {
-                settingsSheetOpen = false
-                createBackup.launch("papernotes-sicherung-${backupDateStamp()}.zip")
-            },
-            onImport = {
-                settingsSheetOpen = false
-                openBackup.launch(arrayOf("application/zip"))
-            },
-        )
-    }
-
-    // Stimmung für die Mehrfachauswahl (abgespeckte Farbreihe)
-    if (selectionMoodOpen) {
-        MoodOnlySheet(
-            onPick = { mood ->
-                viewModel.moodSelected(mood)
-                selectionMoodOpen = false
-            },
-            onDismiss = { selectionMoodOpen = false },
-        )
-    }
-
-    // Karteireiter für die Mehrfachauswahl (fügt den Tag allen gewählten Zetteln hinzu)
-    if (selectionTagOpen) {
-        TagPickerSheet(
-            noteTags = emptyList(),
-            allTags = state.presentTags,
-            onToggle = { tag ->
-                viewModel.tagSelected(tag)
-                selectionTagOpen = false
-            },
-            onAdd = { tag ->
-                viewModel.tagSelected(tag)
-                selectionTagOpen = false
-            },
-            onDismiss = { selectionTagOpen = false },
-        )
-    }
-
-    // Archiv-Schublade
-    if (drawerOpen) {
-        ArchiveDrawerSheet(
-            archived = state.archived,
-            trashed = state.trashed,
-            onRestoreArchived = viewModel::restore,
-            onRestoreTrashed = viewModel::restore,
-            onDismiss = { drawerOpen = false },
-        )
-    }
-}
-
-/** Datumsstempel (JJJJ-MM-TT) für den vorgeschlagenen Sicherungs-Dateinamen. */
-private fun backupDateStamp(): String =
-    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.GERMAN).format(java.util.Date())
-
-/** Kleiner, runder Icon-Button für die obere Leiste (Suche / Archiv). */
-@Composable
-private fun TopAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    description: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .size(42.dp)
-            .paperPress(CircleShape, onClick = onClick)
-            .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                CircleShape,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Icon-Wechsel als kurzer „Stempel"-Pop statt hartem Austausch.
-        AnimatedContent(
-            targetState = icon,
-            label = "topActionIcon",
-            transitionSpec = {
-                (fadeIn(tween(90)) + scaleIn(tween(90), initialScale = 0.7f)) togetherWith
-                    (fadeOut(tween(60)) + scaleOut(tween(60)))
-            },
-        ) { current ->
-            Icon(
-                imageVector = current,
-                contentDescription = description,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyState(modifier: Modifier = Modifier) {
-    // Sanftes Schweben – wirkt lebendig statt statisch.
-    val bob = rememberInfiniteTransition(label = "emptyBob")
-    val phase by bob.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3000), RepeatMode.Reverse),
-        label = "bobPhase",
+    // Vollbild-Overlays: Knüddeln, Papierflieger, Siegelbruch, Konfetti.
+    NotesOverlays(
+        overlays = overlays,
+        onTrash = viewModel::moveToTrash,
+        onOpenNote = onOpenNote,
     )
-    val amp = with(LocalDensity.current) { 6.dp.toPx() }
-    Column(
-        modifier = modifier
-            .padding(32.dp)
-            .graphicsLayer { translationY = phase * amp },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(text = "🌼", style = MaterialTheme.typography.displaySmall)
-        Text(
-            text = "Noch nichts notiert",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = "Tippe auf +, um deine erste Notiz zu schreiben.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.outline,
-            textAlign = TextAlign.Center,
-        )
-    }
+
+    // Alle Bottom-Sheets des Grids; Querschnitts-Aktionen laufen über Callbacks.
+    NotesSheets(
+        state = state,
+        sheets = sheets,
+        viewModel = viewModel,
+        sortMode = sortMode,
+        currentTheme = currentTheme,
+        onPickTheme = { themeViewModel.setTheme(it) },
+        onShare = { target, surface, ink, accent ->
+            val bounds = cardBounds[target.id]
+            overlays.shareText = target.toShareText()
+            val surfaceArgb = surface.toArgb()
+            val inkArgb = ink.toArgb()
+            val accentArgb = accent.toArgb()
+            scope.launch {
+                val uri = withContext(Dispatchers.IO) {
+                    ShareCardRenderer.render(context, target, surfaceArgb, inkArgb, accentArgb)
+                }
+                overlays.shareUri = uri
+                if (bounds != null) {
+                    overlays.shareRequest = PaperPlaneRequest(target.id, bounds, surface)
+                } else if (uri != null) {
+                    context.shareImage(uri, overlays.shareText)
+                } else {
+                    context.sharePlainText(overlays.shareText)
+                }
+            }
+        },
+        onDelete = { target, surface ->
+            val bounds = cardBounds[target.id]
+            if (bounds != null) {
+                overlays.crumple = CrumpleRequest(target.id, bounds, surface)
+            } else {
+                viewModel.moveToTrash(target.id)
+            }
+        },
+        onAttachPhoto = { target ->
+            photoTarget = target
+            pickPhoto.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
+        },
+        onReminderSet = ::ensureNotificationPermission,
+        onEnterArrange = { arrangeMode = true },
+        onExportBackup = { createBackup.launch("papernotes-sicherung-${backupDateStamp()}.zip") },
+        onImportBackup = { openBackup.launch(arrayOf("application/zip")) },
+    )
 }
 
-/** Phasen der Notiz-Fläche: erst laden, dann leer oder Grid. */
-private enum class GridPhase { LOADING, EMPTY, GRID }
-
-/** Hinweis, wenn Suche/Filter keine einzige Notiz treffen – statt nur blasser Tinte. */
-@Composable
-private fun NoMatchState(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.sheetItemEnter(0).padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(text = "🫥", style = MaterialTheme.typography.displaySmall)
-        Text(
-            text = "Keine Notiz passt",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Text(
-            text = "Die Tinte bleibt blass – ändere Suche oder Filter.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.outline,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
