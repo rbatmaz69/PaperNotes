@@ -3,7 +3,10 @@
 
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- SCHEDULE_EXACT_ALARM statt USE_EXACT_ALARM: Letzteres erlaubt Google Play nur
+         Wecker-/Kalender-Apps. Diese Variante kann der Nutzer in den Systemeinstellungen
+         entziehen – der ReminderScheduler fällt dann auf ungenaue Alarme zurück. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application

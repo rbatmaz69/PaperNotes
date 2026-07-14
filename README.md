@@ -155,6 +155,29 @@ Keystore direkt installierbar:
 In Android Studio alternativ **Build → Select Build Variant → `:app` → `release`**, dann **Run**.
 (WLAN-Debugging geht genauso — `adb` sieht das Gerät.)
 
+### 🏪 Play-Store-Release
+Der Release-Build signiert mit dem **Debug-Schlüssel**, solange kein eigener Upload-Key
+eingerichtet ist — gut zum Testen, aber Google Play akzeptiert das nicht. Einmalig:
+
+```bash
+# 1. Upload-Keystore erzeugen (Passwort gut verwahren – ohne ihn kein Update!)
+keytool -genkeypair -v -keystore papernotes-upload.jks -alias upload \
+  -keyalg RSA -keysize 2048 -validity 10000
+
+# 2. keystore.properties im Projekt-Root anlegen (liegt in .gitignore, bleibt lokal):
+#    storeFile=papernotes-upload.jks
+#    storePassword=…
+#    keyAlias=upload
+#    keyPassword=…
+```
+
+Dann baut `./gradlew :app:bundleRelease` das signierte Bundle
+(`app/build/outputs/bundle/release/app-release.aab`) für die Play Console.
+
+Für jedes weitere Release: `versionCode` in `app/build.gradle.kts` erhöhen.
+In der Play Console außerdem nötig: Datenschutzerklärung (die App arbeitet komplett
+offline, keine `INTERNET`-Berechtigung), Data-Safety-Formular, Screenshots & Grafiken.
+
 ### ⚡ Baseline Profile (Kaltstart-Zauber)
 Ein eingecheckter Profil-Datensatz (`app/src/release/generated/baselineProfiles/`) wird bei jedem
 Release-Build automatisch eingebacken — **pro Build kein Schritt nötig.** Neu erzeugen lohnt nur

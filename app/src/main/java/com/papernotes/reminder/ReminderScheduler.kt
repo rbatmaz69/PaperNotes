@@ -28,12 +28,7 @@ class ReminderScheduler @Inject constructor(
         triggerAtMillis: Long,
         rule: ReminderRule = ReminderRule.NONE,
     ) {
-        if (!canScheduleExact()) return
-        alarmManager.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            triggerAtMillis,
-            reminderIntent(noteId, title, rule, mutableUpdate = true),
-        )
+        setAlarm(triggerAtMillis, reminderIntent(noteId, title, rule, mutableUpdate = true))
     }
 
     fun cancel(noteId: Long) {
@@ -42,12 +37,7 @@ class ReminderScheduler @Inject constructor(
 
     /** Plant das Selbst-Öffnen einer Zeitkapsel zum [triggerAtMillis]. */
     fun scheduleCapsule(noteId: Long, triggerAtMillis: Long) {
-        if (!canScheduleExact()) return
-        alarmManager.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            triggerAtMillis,
-            capsuleIntent(noteId, mutableUpdate = true),
-        )
+        setAlarm(triggerAtMillis, capsuleIntent(noteId, mutableUpdate = true))
     }
 
     fun cancelCapsule(noteId: Long) {
@@ -60,12 +50,7 @@ class ReminderScheduler @Inject constructor(
      * Bewusst nicht persistiert – überlebt keinen Reboot (akzeptierter Trade-off).
      */
     fun scheduleSnooze(noteId: Long, title: String, triggerAtMillis: Long) {
-        if (!canScheduleExact()) return
-        alarmManager.setExactAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            triggerAtMillis,
-            snoozeIntent(noteId, title, mutableUpdate = true),
-        )
+        setAlarm(triggerAtMillis, snoozeIntent(noteId, title, mutableUpdate = true))
     }
 
     fun cancelSnooze(noteId: Long) {
@@ -77,7 +62,18 @@ class ReminderScheduler @Inject constructor(
         NotificationManagerCompat.from(context).cancel(noteId.toInt())
     }
 
-    private fun canScheduleExact(): Boolean = alarmManager.canScheduleExactAlarms()
+    /**
+     * Exakter Alarm, wenn der Nutzer SCHEDULE_EXACT_ALARM (noch) gewährt – sonst ungenauer
+     * Alarm als Fallback (feuert im Doze-Fenster, typischerweise wenige Minuten später).
+     * Wichtig: nicht stillschweigend verwerfen, die Erinnerung soll in jedem Fall kommen.
+     */
+    private fun setAlarm(triggerAtMillis: Long, operation: PendingIntent) {
+        if (alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation)
+        } else {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operation)
+        }
+    }
 
     private fun reminderIntent(
         noteId: Long,

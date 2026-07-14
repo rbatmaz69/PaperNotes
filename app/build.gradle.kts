@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,13 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.androidx.baselineprofile)
+}
+
+// Upload-Key für Play-Store-Builds: liegt NICHT im Repo. `keystore.properties` im
+// Projekt-Root mit storeFile/storePassword/keyAlias/keyPassword anlegen (siehe README).
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
 }
 
 android {
@@ -22,15 +31,30 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // Mit dem Debug-Schlüssel signieren, damit der optimierte Release-Build (R8 +
-            // Shrinking) ohne eigenes Keystore-Setup direkt installier- und testbar ist –
-            // und der baselineprofile-Plugin seine abgeleiteten Release-Varianten
-            // (nonMinified/benchmark) signieren kann.
-            signingConfig = signingConfigs.getByName("debug")
+            // Mit Upload-Key signieren, wenn keystore.properties existiert (Play-Store-Build).
+            // Sonst Fallback auf den Debug-Schlüssel, damit der optimierte Release-Build
+            // ohne Keystore-Setup lokal installier- und testbar bleibt – und das
+            // baselineprofile-Plugin seine abgeleiteten Varianten signieren kann.
+            signingConfig = if (keystorePropsFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

@@ -10,3 +10,8 @@
 *.apk
 *.aab
 app/build/
+
+# Release-Signing: Schlüssel und Passwörter bleiben lokal
+/keystore.properties
+*.jks
+*.keystore
