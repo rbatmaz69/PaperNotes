@@ -1,0 +1,120 @@
+name: Release
+
+# Ein Tag `v*` (z. B. v1.0.0) baut die Release-APK und hängt sie an den GitHub-Release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Bereits existierender Tag, der gebaut werden soll (z. B. v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Upload-Key nur einrichten, wenn die Secrets hinterlegt sind. Ohne sie fällt
+      # app/build.gradle.kts auf den Debug-Schlüssel zurück (installierbar, aber kein
+      # stabiler Signatur-Fingerabdruck über Releases hinweg).
+      - name: Upload-Keystore einrichten (optional)
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Kein KEYSTORE_BASE64-Secret – Build wird mit dem Debug-Schlüssel signiert."
+            echo "signed=debug" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > papernotes-upload.jks
+          cat > keystore.properties <<EOF
+          storeFile=papernotes-upload.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+          echo "signed=upload-key" >> "$GITHUB_OUTPUT"
+
+      - name: Unit-Tests
+        run: ./gradlew :app:testReleaseUnitTest
+
+      - name: Release-APK bauen
+        run: ./gradlew :app:assembleRelease
+
+      - name: Artefakte benennen
+        id: artifacts
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/PaperNotes-${VERSION}.apk"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          ( cd dist && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt )
+
+      - name: Schlüssel wieder entfernen
+        if: always()
+        run: rm -f keystore.properties papernotes-upload.jks
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: papernotes-${{ steps.artifacts.outputs.version }}-apk
+          path: dist/
+
+      - name: Testberichte hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+
+      # Der Abschnitt der jeweiligen Version aus CHANGELOG.md wird zum Release-Text —
+      # so gibt es nur eine Quelle der Wahrheit für „was ist neu".
+      - name: Release-Text aus dem CHANGELOG ziehen
+        run: |
+          VERSION="${{ steps.artifacts.outputs.version }}"
+          awk -v v="## [$VERSION]" '
+            index($0, v) == 1 { found = 1; next }
+            found && /^## \[/   { exit }
+            found               { print }
+          ' CHANGELOG.md > release-body.md
+          if [ ! -s release-body.md ]; then
+            echo "Kein CHANGELOG-Abschnitt für $VERSION gefunden." >&2
+            exit 1
+          fi
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "**Signatur dieses Builds:** \`${{ steps.signing.outputs.signed }}\` · gebaut aus \`${{ steps.artifacts.outputs.tag }}\` von GitHub Actions."
+          } >> release-body.md
+
+      - name: Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.artifacts.outputs.tag }}
+          name: PaperNotes ${{ steps.artifacts.outputs.version }}
+          body_path: release-body.md
+          make_latest: true
+          files: |
+            dist/PaperNotes-${{ steps.artifacts.outputs.version }}.apk
+            dist/SHA256SUMS.txt

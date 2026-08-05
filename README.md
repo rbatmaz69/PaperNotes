@@ -10,6 +10,9 @@ sich zerknüllen und wieder glattstreichen lassen.** 🪄
 
 Muji-Ruhe trifft Material 3 — minimal, aber an allen richtigen Stellen verspielt.
 
+**📥 Fertige APK:** [neuester Release](https://github.com/rbatmaz69/PaperNotes/releases/latest)
+(Android 13+) · Was sich geändert hat, steht im [CHANGELOG](CHANGELOG.md).
+
 ---
 
 ## ✨ Was dieser Schreibtisch alles kann
@@ -177,6 +180,30 @@ Dann baut `./gradlew :app:bundleRelease` das signierte Bundle
 Für jedes weitere Release: `versionCode` in `app/build.gradle.kts` erhöhen.
 In der Play Console außerdem nötig: Datenschutzerklärung (die App arbeitet komplett
 offline, keine `INTERNET`-Berechtigung), Data-Safety-Formular, Screenshots & Grafiken.
+
+### 🏷️ GitHub-Release schneiden
+Ein Tag genügt — [`release.yml`](.github/workflows/release.yml) baut die APK auf GitHub Actions,
+zieht den Release-Text aus dem passenden `CHANGELOG.md`-Abschnitt und hängt APK + `SHA256SUMS.txt`
+an den Release:
+
+```bash
+# 1. versionCode/versionName in app/build.gradle.kts anheben
+# 2. Abschnitt "## [X.Y.Z] - JJJJ-MM-TT" in CHANGELOG.md ergänzen
+# 3. committen, pushen — und taggen:
+git tag -a vX.Y.Z -m "PaperNotes X.Y.Z" && git push origin vX.Y.Z
+```
+
+Ohne hinterlegte Secrets signiert der CI-Build mit dem **Debug-Schlüssel** — installierbar, aber
+der Fingerabdruck ändert sich pro Lauf, ein Update über eine ältere APK schlägt also fehl. Für
+einen stabilen Schlüssel diese vier Repository-Secrets setzen (`Settings → Secrets and variables
+→ Actions`), dann signiert der Workflow automatisch mit dem Upload-Key:
+
+| Secret | Inhalt |
+| --- | --- |
+| `KEYSTORE_BASE64` | `base64 -i papernotes-upload.jks` |
+| `KEYSTORE_PASSWORD` | Store-Passwort |
+| `KEY_ALIAS` | z. B. `upload` |
+| `KEY_PASSWORD` | Key-Passwort |
 
 ### ⚡ Baseline Profile (Kaltstart-Zauber)
 Ein eingecheckter Profil-Datensatz (`app/src/release/generated/baselineProfiles/`) wird bei jedem
